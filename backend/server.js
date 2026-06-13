@@ -174,7 +174,7 @@ const distPath = path.join(__dirname, '../dist');
 app.use(express.static(distPath));
 
 // Fallback all other routes to index.html for React Router (if used) or standard Single Page App behavior
-app.get('*', (req, res) => {
+app.get(/^(.*)$/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
