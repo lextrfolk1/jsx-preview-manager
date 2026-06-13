@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:3001/api/pairs';
-
+const API_BASE = import.meta.env.PROD 
+  ? '/api/pairs' 
+  : 'http://localhost:3001/api/pairs';
 export const getPairs = async () => {
   const res = await axios.get(API_BASE);
   return res.data;

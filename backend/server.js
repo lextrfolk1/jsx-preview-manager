@@ -169,6 +169,15 @@ app.delete('/api/pairs/:pairId/versions/:version', async (req, res) => {
   }
 });
 
+// Serve frontend static files in production
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
+
+// Fallback all other routes to index.html for React Router (if used) or standard Single Page App behavior
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
