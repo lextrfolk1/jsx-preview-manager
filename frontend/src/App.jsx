@@ -23,7 +23,8 @@ export default function App() {
   
   // UI for uploading
   const [showUpload, setShowUpload] = useState(false);
-  const [uploadForm, setUploadForm] = useState({ name: '', desc: '', jsxFile: null, jsonFile: null });
+  const [uploadMode, setUploadMode] = useState('files'); // 'files' or 'zip'
+  const [uploadForm, setUploadForm] = useState({ name: '', desc: '', jsxFile: null, jsonFile: null, zipFile: null });
 
   useEffect(() => {
     loadPairs();
@@ -65,13 +66,14 @@ export default function App() {
   const handleCreatePair = async (e) => {
     e.preventDefault();
     try {
-      const p = await createPair(uploadForm.name, uploadForm.desc, uploadForm.jsxFile, uploadForm.jsonFile);
+      const p = await createPair(uploadForm.name, uploadForm.desc, uploadForm.jsxFile, uploadForm.jsonFile, uploadForm.zipFile);
       setShowUpload(false);
-      setUploadForm({ name: '', desc: '', jsxFile: null, jsonFile: null });
+      setUploadForm({ name: '', desc: '', jsxFile: null, jsonFile: null, zipFile: null });
       await loadPairs();
       setSelectedPairId(p.id);
+      toast.success('Pair created successfully!');
     } catch (err) {
-      setErrorMsg('Failed to create pair: ' + err.message);
+      toast.error('Failed to create pair: ' + err.message);
     }
   };
 
@@ -144,7 +146,11 @@ export default function App() {
   const handleDownloadZip = () => {
     if (!selectedPairId || !selectedVersion) return;
     const url = `http://localhost:3001/api/pairs/${selectedPairId}/versions/${selectedVersion}/download`;
-    window.open(url, '_blank');
+    const a = document.createElement('a');
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -152,38 +158,38 @@ export default function App() {
       <Toaster position="top-right" />
       
       {/* SIDEBAR */}
-      <div className="w-64 bg-white border-r flex flex-col">
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-          <h1 className="font-bold text-gray-800 flex items-center gap-2">
+      <div className="w-72 bg-white shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-slate-100 flex flex-col z-20">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <h1 className="font-bold text-slate-800 flex items-center gap-2 text-lg tracking-tight">
             <Layers size={18} /> Preview Manager
           </h1>
         </div>
         
-        <div className="p-2 border-b">
+        <div className="p-3 border-b border-slate-100">
           <button 
             onClick={() => setShowUpload(true)}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 text-sm font-medium"
+            className="w-full flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 py-2.5 px-4 rounded-lg hover:bg-indigo-100 hover:text-indigo-800 text-sm font-semibold transition-all"
           >
             <FilePlus size={16} /> New Pair
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
           {pairs.map(p => (
             <div 
               key={p.id} 
-              className={`p-3 rounded cursor-pointer group flex justify-between items-center ${selectedPairId === p.id ? 'bg-blue-50 border-blue-200 border text-blue-700' : 'hover:bg-gray-50 border border-transparent'}`}
+              className={`p-3 rounded-xl cursor-pointer group flex justify-between items-center transition-all duration-200 ${selectedPairId === p.id ? 'bg-indigo-50 border-indigo-100 border text-indigo-800 shadow-sm' : 'hover:bg-slate-50 border border-transparent text-slate-700 hover:text-slate-900'}`}
               onClick={() => setSelectedPairId(p.id)}
             >
               <div>
-                <div className="font-medium text-sm truncate w-40">{p.name}</div>
-                {p.activeVersion && <div className="text-xs text-gray-500 mt-1">Active: {p.activeVersion}</div>}
+                <div className="font-medium text-sm truncate w-44">{p.name}</div>
+                {p.activeVersion && <div className="text-xs text-slate-500 mt-1">Active: <span className="font-mono bg-white px-1 py-0.5 rounded border border-slate-100">{p.activeVersion}</span></div>}
               </div>
               <button 
-                className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1"
+                className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-md transition-colors"
                 onClick={(e) => { e.stopPropagation(); handleDeletePair(p.id); }}
               >
-                <Trash2 size={14} />
+                <Trash2 size={16} />
               </button>
             </div>
           ))}
@@ -195,15 +201,15 @@ export default function App() {
         {selectedPairId && pairMeta ? (
           <>
             {/* TOP BAR */}
-            <div className="h-14 bg-white border-b px-4 flex items-center justify-between shadow-sm">
+            <div className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shadow-sm z-10 relative">
               <div className="flex items-center gap-4">
-                <h2 className="font-bold text-lg">{pairMeta.name}</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Version:</span>
+                <h2 className="font-bold text-xl text-slate-800 tracking-tight">{pairMeta.name}</h2>
+                <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                  <span className="text-sm font-medium text-slate-500">Version:</span>
                   <select 
                     value={selectedVersion || ''} 
                     onChange={(e) => setSelectedVersion(e.target.value)}
-                    className="border rounded px-2 py-1 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+                    className="bg-transparent text-sm font-mono font-medium text-slate-700 outline-none cursor-pointer"
                   >
                     {pairMeta.versions?.map(v => (
                       <option key={v.id} value={v.id}>{v.id} {v.id === pairMeta.activeVersion ? '(Active)' : ''}</option>
@@ -212,36 +218,36 @@ export default function App() {
                 </div>
               </div>
               
-              <div className="flex gap-2">
-                <button onClick={handleDownloadZip} className="flex items-center gap-1 bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700">
-                  <Download size={14} /> Download Zip
+              <div className="flex gap-3">
+                <button onClick={handleDownloadZip} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-all shadow-sm">
+                  <Download size={16} /> Download
                 </button>
-                <button onClick={handleSaveCurrentVersion} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700">
-                  <Save size={14} /> Save
+                <button onClick={handleSaveCurrentVersion} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md">
+                  <Save size={16} /> Save
                 </button>
-                <button onClick={handleJsxSaveNewVersion} className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded text-sm hover:bg-indigo-700">
-                  <Copy size={14} /> Save as New Version
+                <button onClick={handleJsxSaveNewVersion} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-900 transition-all shadow-sm hover:shadow-md">
+                  <Copy size={16} /> Save as New Version
                 </button>
               </div>
             </div>
 
             {/* TAB BAR */}
-            <div className="flex bg-white border-b items-center justify-between pr-4">
-              <div className="flex">
+            <div className="flex bg-white border-b border-slate-200 items-center justify-between px-6 z-10 relative">
+              <div className="flex gap-6">
                 <button 
-                  className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'preview' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
+                  className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'preview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
                   onClick={() => setActiveTab('preview')}
                 >
                   <Play size={16} /> Preview UI
                 </button>
                 <button 
-                  className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'jsx' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
+                  className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'jsx' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
                   onClick={() => setActiveTab('jsx')}
                 >
                   <Code size={16} /> JSX Editor
                 </button>
                 <button 
-                  className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'json' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
+                  className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'json' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
                   onClick={() => setActiveTab('json')}
                 >
                   <FileJson size={16} /> JSON Data
@@ -251,27 +257,27 @@ export default function App() {
               {(activeTab === 'jsx' || activeTab === 'json') && (
                 <button 
                   onClick={() => setIsEditingCode(!isEditingCode)} 
-                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium text-white transition-colors ${isEditingCode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase text-white shadow-sm transition-all ${isEditingCode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-500 hover:bg-indigo-600'}`}
                 >
-                  {isEditingCode ? <><X size={14} /> Lock {activeTab.toUpperCase()}</> : <><Edit3 size={14} /> Edit {activeTab.toUpperCase()}</>}
+                  {isEditingCode ? <><X size={14} /> Lock {activeTab}</> : <><Edit3 size={14} /> Edit {activeTab}</>}
                 </button>
               )}
             </div>
 
             {/* WORKSPACE & ERROR PANEL */}
-            <div className="flex-1 flex flex-col overflow-hidden relative">
+            <div className="flex-1 p-6 flex flex-col overflow-hidden relative">
               {errorMsg && (
-                <div className="bg-red-50 border-b border-red-200 text-red-700 p-3 flex items-start gap-2 text-sm z-10">
-                  <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl mb-4 flex items-start gap-3 text-sm shadow-sm">
+                  <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
                   <pre className="whitespace-pre-wrap font-mono">{errorMsg}</pre>
                 </div>
               )}
 
-              <div className="flex-1 overflow-hidden relative bg-white">
+              <div className="flex-1 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative bg-white ring-1 ring-slate-900/5">
                 {activeTab === 'preview' && (
                   <div className="absolute inset-0 flex flex-col">
-                    <div className="flex justify-end p-2 bg-gray-50 border-b">
-                       <button onClick={() => setIsFullscreen(true)} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+                    <div className="absolute top-4 right-4 z-10">
+                       <button onClick={() => setIsFullscreen(true)} className="flex items-center gap-2 px-3 py-2 bg-white/90 backdrop-blur shadow-md rounded-lg text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-white transition-all">
                          <Maximize size={16} /> Fullscreen
                        </button>
                     </div>
@@ -349,29 +355,66 @@ export default function App() {
 
       {/* UPLOAD MODAL */}
       {showUpload && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96 shadow-xl">
-            <h2 className="text-lg font-bold mb-4">Create New Pair</h2>
-            <form onSubmit={handleCreatePair} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pair Name *</label>
-                <input required type="text" className="w-full border rounded px-3 py-2 text-sm" value={uploadForm.name} onChange={e => setUploadForm({...uploadForm, name: e.target.value})} placeholder="e.g. user-profile" />
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] overflow-hidden transform transition-all">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Create New Pair</h2>
+              <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreatePair} className="p-6 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pair Name *</label>
+                  <input required type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow" value={uploadForm.name} onChange={e => setUploadForm({...uploadForm, name: e.target.value})} placeholder="e.g. user-dashboard" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description</label>
+                  <input type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow" value={uploadForm.desc} onChange={e => setUploadForm({...uploadForm, desc: e.target.value})} placeholder="Brief description..." />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <input type="text" className="w-full border rounded px-3 py-2 text-sm" value={uploadForm.desc} onChange={e => setUploadForm({...uploadForm, desc: e.target.value})} />
+
+              <div className="border-t border-slate-100 pt-4">
+                <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
+                  <button type="button" onClick={() => setUploadMode('files')} className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-all ${uploadMode === 'files' ? 'bg-white shadow text-indigo-700' : 'text-slate-600 hover:text-slate-900'}`}>Upload Individual Files</button>
+                  <button type="button" onClick={() => setUploadMode('zip')} className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-all ${uploadMode === 'zip' ? 'bg-white shadow text-indigo-700' : 'text-slate-600 hover:text-slate-900'}`}>Upload ZIP Archive</button>
+                </div>
+
+                {uploadMode === 'files' ? (
+                  <div className="space-y-4">
+                    <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative">
+                      <label className="flex flex-col items-center justify-center cursor-pointer">
+                        <Code className="text-indigo-400 mb-2" size={24} />
+                        <span className="text-sm font-medium text-slate-700">Select JSX File</span>
+                        <span className="text-xs text-slate-500 mt-1">{uploadForm.jsxFile ? uploadForm.jsxFile.name : 'No file chosen'}</span>
+                        <input type="file" accept=".jsx,.js" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, jsxFile: e.target.files[0]})} />
+                      </label>
+                    </div>
+                    <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative">
+                      <label className="flex flex-col items-center justify-center cursor-pointer">
+                        <Database className="text-emerald-400 mb-2" size={24} />
+                        <span className="text-sm font-medium text-slate-700">Select JSON File</span>
+                        <span className="text-xs text-slate-500 mt-1">{uploadForm.jsonFile ? uploadForm.jsonFile.name : 'No file chosen'}</span>
+                        <input type="file" accept=".json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, jsonFile: e.target.files[0]})} />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-slate-300 rounded-xl p-8 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative flex flex-col items-center justify-center">
+                    <FilePlus className="text-indigo-500 mb-3" size={32} />
+                    <span className="text-sm font-medium text-slate-700">Upload ZIP Archive</span>
+                    <span className="text-xs text-slate-500 mt-1 text-center">Should contain your component and data files.</span>
+                    <span className="text-sm font-bold text-indigo-600 mt-3">{uploadForm.zipFile ? uploadForm.zipFile.name : 'Click to Browse'}</span>
+                    <input type="file" accept=".zip" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, zipFile: e.target.files[0]})} />
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">JSX File</label>
-                <input type="file" accept=".jsx,.js" className="text-sm" onChange={e => setUploadForm({...uploadForm, jsxFile: e.target.files[0]})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">JSON File</label>
-                <input type="file" accept=".json" className="text-sm" onChange={e => setUploadForm({...uploadForm, jsonFile: e.target.files[0]})} />
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button type="button" onClick={() => setShowUpload(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Create</button>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowUpload(false)} className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
+                <button type="submit" className="px-5 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm hover:shadow transition-all">Create Pair</button>
               </div>
             </form>
           </div>

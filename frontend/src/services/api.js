@@ -17,12 +17,13 @@ export const getPairVersion = async (pairId, version) => {
   return res.data;
 };
 
-export const createPair = async (name, description, jsxFile, jsonFile) => {
+export const createPair = async (name, description, jsxFile, jsonFile, zipFile) => {
   const formData = new FormData();
   formData.append('name', name);
-  formData.append('description', description);
+  formData.append('description', description || '');
   if (jsxFile) formData.append('jsx', jsxFile);
   if (jsonFile) formData.append('json', jsonFile);
+  if (zipFile) formData.append('zip', zipFile);
   
   const res = await axios.post(API_BASE, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

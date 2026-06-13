@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const storageService = require('./storageService');
-const archiver = require('archiver');
+const AdmZip = require('adm-zip');
 const path = require('path');
 
 const app = express();
@@ -51,16 +51,13 @@ app.get('/api/pairs/:pairId/versions/:version/download', async (req, res) => {
     if (!v) return res.status(404).json({ error: 'Version not found' });
     
     res.attachment(`${req.params.pairId}-${req.params.version}.zip`);
-    const archive = archiver('zip', { zlib: { level: 9 } });
     
-    archive.on('error', function(err) {
-      throw err;
-    });
+    const zip = new AdmZip();
+    const folderName = `${req.params.pairId}-${req.params.version}`;
+    zip.addFile(`${folderName}/component.jsx`, Buffer.from(v.component || '', 'utf8'));
+    zip.addFile(`${folderName}/data.json`, Buffer.from(JSON.stringify(v.data || {}, null, 2), 'utf8'));
     
-    archive.pipe(res);
-    archive.append(v.component || '', { name: 'component.jsx' });
-    archive.append(JSON.stringify(v.data || {}, null, 2), { name: 'data.json' });
-    archive.finalize();
+    res.send(zip.toBuffer());
   } catch (err) {
     if (!res.headersSent) {
       res.status(500).json({ error: err.message });
@@ -69,7 +66,7 @@ app.get('/api/pairs/:pairId/versions/:version/download', async (req, res) => {
 });
 
 // POST new pair
-app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }]), async (req, res) => {
+app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }, { name: 'zip' }]), async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -80,14 +77,31 @@ app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }]), async
     let componentStr = 'export default function Component() { return <div>Empty</div>; }';
     let dataObj = {};
     
-    if (req.files['jsx']) {
-      componentStr = req.files['jsx'][0].buffer.toString('utf-8');
-    }
-    if (req.files['json']) {
+    if (req.files['zip']) {
       try {
-        dataObj = JSON.parse(req.files['json'][0].buffer.toString('utf-8'));
-      } catch (e) {
-        return res.status(400).json({ error: 'Invalid JSON file' });
+        const zip = new AdmZip(req.files['zip'][0].buffer);
+        const zipEntries = zip.getEntries();
+        const jsxEntry = zipEntries.find(e => !e.isDirectory && (e.entryName.endsWith('.jsx') || e.entryName.endsWith('.js')));
+        if (jsxEntry) {
+          componentStr = zip.readAsText(jsxEntry);
+        }
+        const jsonEntry = zipEntries.find(e => !e.isDirectory && e.entryName.endsWith('.json') && !e.entryName.includes('metadata.json'));
+        if (jsonEntry) {
+          dataObj = JSON.parse(zip.readAsText(jsonEntry));
+        }
+      } catch (err) {
+        return res.status(400).json({ error: 'Failed to parse ZIP file: ' + err.message });
+      }
+    } else {
+      if (req.files['jsx']) {
+        componentStr = req.files['jsx'][0].buffer.toString('utf-8');
+      }
+      if (req.files['json']) {
+        try {
+          dataObj = JSON.parse(req.files['json'][0].buffer.toString('utf-8'));
+        } catch (e) {
+          return res.status(400).json({ error: 'Invalid JSON file' });
+        }
       }
     }
 

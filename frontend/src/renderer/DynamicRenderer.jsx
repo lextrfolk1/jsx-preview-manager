@@ -72,12 +72,24 @@ export default function DynamicRenderer({ jsxCode, jsonData, onChange, onAction,
               
               const root = ReactDOM.createRoot(document.getElementById('root'));
               
-              let ComponentToRender = exports.default || module.exports.default || module.exports;
+              let ComponentToRender = exports.default || module.exports.default;
               
-              if (ComponentToRender && typeof ComponentToRender === 'function' || typeof ComponentToRender === 'object') {
+              if (!ComponentToRender && typeof module.exports === 'object') {
+                // If they used named exports instead of default, find the first function
+                const exportKeys = Object.keys(module.exports).filter(k => k !== '__esModule');
+                if (exportKeys.length > 0 && typeof module.exports[exportKeys[0]] === 'function') {
+                  ComponentToRender = module.exports[exportKeys[0]];
+                } else {
+                  ComponentToRender = module.exports;
+                }
+              } else if (!ComponentToRender) {
+                ComponentToRender = module.exports;
+              }
+              
+              if (ComponentToRender && (typeof ComponentToRender === 'function' || (typeof ComponentToRender === 'object' && ComponentToRender.$$typeof))) {
                  root.render(React.createElement(ComponentToRender, { data, onChange, onAction }));
               } else {
-                 throw new Error("Could not find a default export component.");
+                 throw new Error("Could not find a valid React component. Ensure your code has 'export default YourComponent;'.");
               }
             } catch (err) {
               window.parent.postMessage({ source: 'dynamic-preview', type: 'error', message: err.message }, '*');
