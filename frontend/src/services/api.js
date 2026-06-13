@@ -31,18 +31,13 @@ export const createPair = async (name, description, jsxFile, jsonFile, zipFile) 
   return res.data;
 };
 
-export const saveVersion = async (pairId, version, component, data) => {
-  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save`, { component, data });
+export const saveVersion = async (pairId, version, files) => {
+  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save`, { files });
   return res.data;
 };
 
-export const saveJson = async (pairId, version, data) => {
-  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save-json`, { data });
-  return res.data;
-};
-
-export const saveJsx = async (pairId, version, component, data) => {
-  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save-jsx`, { component, data });
+export const createVersion = async (pairId, files) => {
+  const res = await axios.post(`${API_BASE}/${pairId}/versions`, { files });
   return res.data;
 };
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getPairs, getPair, getPairVersion, createPair, saveVersion, saveJson, saveJsx, deletePair } from './services/api';
+import { getPairs, getPair, getPairVersion, createPair, saveVersion, createVersion, deletePair } from './services/api';
 import DynamicRenderer from './renderer/DynamicRenderer';
 import Editor from '@monaco-editor/react';
-import { Play, Code, Database, Save, FilePlus, Trash2, Copy, AlertCircle, FileJson, Layers, Download, Maximize, Minimize, Edit3, X } from 'lucide-react';
+import { Play, Code, Database, Save, FilePlus, Trash2, Copy, AlertCircle, FileJson, Layers, Download, Maximize, Minimize, Edit3, X, ChevronRight } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -10,21 +10,25 @@ export default function App() {
   const [selectedPairId, setSelectedPairId] = useState(null);
   const [pairMeta, setPairMeta] = useState(null);
   const [selectedVersion, setSelectedVersion] = useState(null);
-  const [versionData, setVersionData] = useState({ component: '', data: {} });
+  const [versionData, setVersionData] = useState({ files: [], metadata: {} });
+  const [activeTab, setActiveTab] = useState('preview');
+  const [isFileTreeExpanded, setIsFileTreeExpanded] = useState(false);
   
-  const [activeTab, setActiveTab] = useState('preview'); // preview, jsx, json
   const [errorMsg, setErrorMsg] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEditingCode, setIsEditingCode] = useState(false);
   
   // Local edit states
-  const [localJsx, setLocalJsx] = useState('');
-  const [localJson, setLocalJson] = useState('{}');
+  const [localFiles, setLocalFiles] = useState([]);
+  const [selectedFileName, setSelectedFileName] = useState('');
 
+  const componentJsx = localFiles.find(f => f.name.endsWith('.jsx') || f.name.endsWith('.js'))?.content || '';
+  const dataJsonFile = localFiles.find(f => f.name.endsWith('.json') && !f.name.includes('metadata.json'));
+  
   const parsedJsonData = useMemo(() => {
-    if (localJson === null) return null;
-    try { return JSON.parse(localJson); } catch (e) { return {}; }
-  }, [localJson]);
+    if (!dataJsonFile) return null;
+    try { return JSON.parse(dataJsonFile.content); } catch (e) { return {}; }
+  }, [dataJsonFile?.content]);
   
   // UI for uploading
   const [showUpload, setShowUpload] = useState(false);
@@ -64,10 +68,13 @@ export default function App() {
   const loadVersionData = async (pairId, version) => {
     const data = await getPairVersion(pairId, version);
     setVersionData(data);
-    setLocalJsx(data.component);
-    setLocalJson(data.data !== null ? JSON.stringify(data.data, null, 2) : null);
-    if (activeTab === 'json' && data.data === null) {
-      setActiveTab('preview');
+    setLocalFiles(data.files || []);
+    if (data.files && data.files.length > 0) {
+      if (!data.files.find(f => f.name === selectedFileName)) {
+        setSelectedFileName(data.files[0].name);
+      }
+    } else {
+      setSelectedFileName('');
     }
     setErrorMsg('');
   };
@@ -102,22 +109,9 @@ export default function App() {
     }
   };
 
-  const handleJsonSave = async () => {
-    try {
-      let parsed = JSON.parse(localJson);
-      await saveJson(selectedPairId, selectedVersion, parsed);
-      loadVersionData(selectedPairId, selectedVersion);
-      setErrorMsg('');
-      toast.success('JSON Saved');
-    } catch (err) {
-      setErrorMsg('Invalid JSON: ' + err.message);
-    }
-  };
-
   const handleSaveCurrentVersion = async () => {
     try {
-      let parsedJson = localJson !== null ? JSON.parse(localJson) : null;
-      await saveVersion(selectedPairId, selectedVersion, localJsx, parsedJson);
+      await saveVersion(selectedPairId, selectedVersion, localFiles);
       loadVersionData(selectedPairId, selectedVersion);
       setErrorMsg('');
       toast.success('Version Saved');
@@ -135,8 +129,7 @@ export default function App() {
 
     const timer = setTimeout(async () => {
       try {
-        let parsedJson = localJson !== null ? JSON.parse(localJson) : null;
-        await saveVersion(selectedPairId, selectedVersion, localJsx, parsedJson);
+        await saveVersion(selectedPairId, selectedVersion, localFiles);
         // Silently saved, don't show toast to avoid spam
       } catch (err) {
         // Syntax errors while typing shouldn't spam the console too much, we already show UI errors
@@ -144,38 +137,31 @@ export default function App() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [localJsx, localJson, selectedPairId, selectedVersion, isEditingCode]);
+  }, [localFiles, selectedPairId, selectedVersion, isEditingCode]);
 
   const handleJsxSaveNewVersion = async () => {
     try {
-      let parsedJson = localJson !== null ? JSON.parse(localJson) : null;
-      const newVersion = await saveJsx(selectedPairId, selectedVersion, localJsx, parsedJson);
+      const newVersion = await createVersion(selectedPairId, localFiles);
       await loadPairData(selectedPairId);
       setSelectedVersion(newVersion.metadata?.id || newVersion.id); // switch to new version
       setErrorMsg('');
       toast.success('Saved as new version');
     } catch (err) {
-      setErrorMsg('Failed to save JSX: ' + err.message);
+      setErrorMsg('Failed to save new version: ' + err.message);
     }
   };
 
-  const handleRendererChange = (path, value) => {
-    // Basic lodash.set style update can be complex.
-    // For simplicity, if path matches top level property we update it.
-    try {
-      let parsed = JSON.parse(localJson);
-      parsed[path] = value;
-      const newStr = JSON.stringify(parsed, null, 2);
-      setLocalJson(newStr);
-      // Auto save or let user save?
-    } catch (e) {
-      console.error(e);
+  const handleAddNewFile = () => {
+    const filename = prompt('Enter filename (e.g. data.json):');
+    if (!filename) return;
+    if (localFiles.find(f => f.name === filename)) {
+      toast.error('File already exists');
+      return;
     }
-  };
-
-  const handleRendererAction = (actionName, payload) => {
-    console.log('Action triggered:', actionName, payload);
-    toast('Action Triggered: ' + actionName, { icon: '⚡' });
+    const newFiles = [...localFiles, { name: filename, content: filename.endsWith('.json') ? '{}' : '' }];
+    setLocalFiles(newFiles);
+    setSelectedFileName(filename);
+    setActiveTab(filename);
   };
 
   const handleDownloadZip = () => {
@@ -211,22 +197,81 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
           {pairs.map(p => (
-            <div 
-              key={p.id} 
-              className={`p-3 rounded-xl cursor-pointer group flex justify-between items-center transition-all duration-200 ${selectedPairId === p.id ? 'bg-indigo-50 border-indigo-100 border text-indigo-800 shadow-sm' : 'hover:bg-slate-50 border border-transparent text-slate-700 hover:text-slate-900'}`}
-              onClick={() => setSelectedPairId(p.id)}
-            >
-              <div>
-                <div className="font-medium text-sm truncate w-44">{p.name}</div>
-                {p.activeVersion && <div className="text-xs text-slate-500 mt-1">Active: <span className="font-mono bg-white px-1 py-0.5 rounded border border-slate-100">{p.activeVersion}</span></div>}
-              </div>
-              <button 
-                className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-md transition-colors"
-                onClick={(e) => { e.stopPropagation(); setPairToDelete(p.id); }}
+              <div 
+                className={`p-2.5 rounded-xl cursor-pointer transition-all duration-200 flex flex-col ${selectedPairId === p.id ? 'bg-indigo-50 border-indigo-100 border shadow-sm' : 'hover:bg-slate-50 border border-transparent text-slate-700 hover:text-slate-900'}`}
+                onClick={() => {
+                  if (selectedPairId === p.id) {
+                    setIsFileTreeExpanded(!isFileTreeExpanded);
+                  } else {
+                    setSelectedPairId(p.id);
+                    setIsFileTreeExpanded(false);
+                    setSelectedVersion(p.activeVersion || p.versions[p.versions.length-1]?.id);
+                    setActiveTab('preview');
+                  }
+                }}
               >
-                <Trash2 size={16} />
-              </button>
-            </div>
+                <div className="flex justify-between items-center group">
+                  <div className="flex items-center gap-2">
+                    <div className={`text-slate-400 transition-transform ${selectedPairId === p.id && isFileTreeExpanded ? 'rotate-90' : ''}`}>
+                      <ChevronRight size={16} />
+                    </div>
+                    <div>
+                      <div className={`font-medium text-sm truncate w-36 ${selectedPairId === p.id ? 'text-indigo-800' : ''}`}>{p.name}</div>
+                      {p.activeVersion && <div className="text-xs text-slate-500 mt-0.5">Active: <span className="font-mono bg-white px-1 py-0.5 rounded border border-slate-100">{p.activeVersion}</span></div>}
+                    </div>
+                  </div>
+                  <button 
+                    className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-md transition-colors"
+                    onClick={(e) => { e.stopPropagation(); setPairToDelete(p.id); }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                {/* FILE TREE */}
+                {selectedPairId === p.id && isFileTreeExpanded && (
+                  <div className="mt-2 space-y-0.5">
+                    {localFiles.map(f => (
+                      <div 
+                        key={f.name}
+                        className={`text-[13px] py-1 px-2 ml-6 rounded cursor-pointer flex items-center justify-between group/file transition-colors ${selectedFileName === f.name ? 'bg-slate-200/60 text-slate-900 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedFileName(f.name); setActiveTab(f.name); }}
+                      >
+                        <div className="flex items-center gap-2">
+                           <Code size={13} className={selectedFileName === f.name ? 'text-indigo-500' : 'text-slate-400'} />
+                           <span className="truncate">{f.name}</span>
+                        </div>
+                        <button 
+                           title="Delete File"
+                           className={`opacity-0 group-hover/file:opacity-100 p-1 rounded transition-colors ${selectedFileName === f.name ? 'text-slate-500 hover:text-rose-600' : 'text-slate-400 hover:text-rose-600'}`}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             if (window.confirm(`Delete ${f.name}?`)) {
+                               const newFiles = localFiles.filter(lf => lf.name !== f.name);
+                               setLocalFiles(newFiles);
+                               if (selectedFileName === f.name) {
+                                 setSelectedFileName('');
+                                 setActiveTab('preview');
+                               }
+                               saveVersion(selectedPairId, selectedVersion, newFiles).then(() => {
+                                  toast.success(`${f.name} deleted`);
+                               });
+                             }
+                           }}
+                        >
+                           <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    <button 
+                      className="text-[13px] mt-1 ml-6 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium py-1 px-2 rounded flex items-center gap-2 w-[calc(100%-1.5rem)] transition-colors"
+                      onClick={(e) => { e.stopPropagation(); handleAddNewFile(); }}
+                    >
+                      <FilePlus size={13} /> <span className="opacity-80">Add File</span>
+                    </button>
+                  </div>
+                )}
+              </div>
           ))}
         </div>
       </div>
@@ -266,55 +311,32 @@ export default function App() {
               </div>
             </div>
 
-            {/* TAB BAR */}
-            <div className="flex bg-white border-b border-slate-200 items-center justify-between px-6 z-10 relative">
-              <div className="flex gap-6">
+            {/* GLOBAL TAB BAR */}
+            <div className="flex bg-white border-b border-slate-200 px-6 z-10 relative overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 items-end">
                 <button 
-                  className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'preview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
+                  className={`px-5 py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === 'preview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
                   onClick={() => setActiveTab('preview')}
                 >
-                  <Play size={16} /> Preview UI
+                  <Play size={16} className={activeTab === 'preview' ? 'text-indigo-500' : 'text-slate-400'} /> Live Preview
                 </button>
-                <button 
-                  className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'jsx' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
-                  onClick={() => setActiveTab('jsx')}
-                >
-                  <Code size={16} /> Component JSX
-                </button>
-                {localJson !== null && (
+                
+                <div className="w-px h-6 bg-slate-200 mx-2 mb-3"></div>
+                
+                {localFiles.map(f => (
                   <button 
-                    className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'json' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
-                    onClick={() => setActiveTab('json')}
+                    key={f.name}
+                    className={`px-5 py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === f.name ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
+                    onClick={() => { setActiveTab(f.name); setSelectedFileName(f.name); }}
                   >
-                    <FileJson size={16} /> Data JSON
+                    <Code size={16} className={activeTab === f.name ? 'text-indigo-500' : 'text-slate-400'} /> {f.name}
                   </button>
-                )}
-                {localJson === null && (
-                  <button 
-                    className="py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-emerald-600 hover:text-emerald-700 hover:border-emerald-200 transition-all"
-                    onClick={async () => {
-                      await saveJson(selectedPairId, selectedVersion, {});
-                      await loadVersionData(selectedPairId, selectedVersion);
-                      setActiveTab('json');
-                    }}
-                  >
-                    <FilePlus size={16} /> Add data.json
-                  </button>
-                )}
+                ))}
               </div>
-
-              {(activeTab === 'jsx' || activeTab === 'json') && (
-                <button 
-                  onClick={() => setIsEditingCode(!isEditingCode)} 
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase text-white shadow-sm transition-all ${isEditingCode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-500 hover:bg-indigo-600'}`}
-                >
-                  {isEditingCode ? <><X size={14} /> Lock {activeTab}</> : <><Edit3 size={14} /> Edit {activeTab}</>}
-                </button>
-              )}
             </div>
 
             {/* WORKSPACE & ERROR PANEL */}
-            <div className="flex-1 p-6 flex flex-col overflow-hidden relative">
+            <div className="flex-1 p-6 flex flex-col overflow-hidden relative bg-slate-50/50">
               {errorMsg && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl mb-4 flex items-start gap-3 text-sm shadow-sm">
                   <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
@@ -323,47 +345,70 @@ export default function App() {
               )}
 
               <div className="flex-1 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative bg-white ring-1 ring-slate-900/5">
-                {activeTab === 'preview' && (
+                {activeTab !== 'preview' ? (
                   <div className="absolute inset-0 flex flex-col">
+                    <div className="h-12 border-b border-slate-100 flex items-center justify-end px-4 bg-slate-50/80">
+                      <button 
+                        onClick={() => setIsEditingCode(!isEditingCode)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isEditingCode ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                      >
+                        {isEditingCode ? <Save size={14} /> : <Edit3 size={14} />}
+                        {isEditingCode ? 'Editing...' : 'Unlock Editor'}
+                      </button>
+                    </div>
+                    
+                    <div className="flex-1 relative">
+                      <Editor
+                        height="100%"
+                        language={activeTab.endsWith('.json') ? 'json' : 'javascript'}
+                        value={localFiles.find(f => f.name === activeTab)?.content || ''}
+                        theme="vs-light"
+                        options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on', readOnly: !isEditingCode, scrollBeyondLastLine: false }}
+                        onChange={(val) => {
+                          if (!isEditingCode) return;
+                          const newFiles = [...localFiles];
+                          const idx = newFiles.findIndex(f => f.name === activeTab);
+                          if (idx > -1) newFiles[idx].content = val || '';
+                          setLocalFiles(newFiles);
+                        }}
+                      />
+                      {!isEditingCode && (
+                        <div className="absolute inset-0 bg-slate-50/40 cursor-not-allowed z-10 flex items-center justify-center backdrop-blur-[1px]">
+                          <div className="bg-white/90 px-4 py-2 rounded-lg shadow-sm border border-slate-200 text-sm font-medium text-slate-500 flex items-center gap-2">
+                            <AlertCircle size={16} /> Click "Unlock Editor" to make changes
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex flex-col bg-white">
                     <div className="absolute top-4 right-4 z-10">
-                       <button onClick={() => setIsFullscreen(true)} className="flex items-center gap-2 px-3 py-2 bg-white/90 backdrop-blur shadow-md rounded-lg text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-white transition-all">
-                         <Maximize size={16} /> Fullscreen
+                       <button onClick={() => setIsFullscreen(true)} className="flex items-center gap-2 px-3 py-2 bg-white/90 backdrop-blur shadow-md rounded-lg text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-white transition-all border border-slate-200">
+                         <Maximize size={14} /> Fullscreen
                        </button>
                     </div>
                     <div className="flex-1 relative">
                       <DynamicRenderer
-                        jsxCode={localJsx}
+                        jsxCode={componentJsx}
                         jsonData={parsedJsonData}
-                        onChange={handleRendererChange}
-                        onAction={handleRendererAction}
+                        onChange={(path, value) => {
+                          if (!parsedJsonData || typeof parsedJsonData !== 'object') return;
+                          const newData = { ...parsedJsonData };
+                          if (newData[path] !== undefined) newData[path] = value;
+                          const newFiles = [...localFiles];
+                          const idx = newFiles.findIndex(f => f.name.endsWith('.json') && !f.name.includes('metadata.json'));
+                          if (idx > -1) {
+                            newFiles[idx].content = JSON.stringify(newData, null, 2);
+                            setLocalFiles(newFiles);
+                          }
+                        }}
+                        onAction={(actionName, payload) => {
+                          toast(`Action Triggered: ${actionName}`, { icon: '⚡' });
+                        }}
                         onError={setErrorMsg}
                       />
                     </div>
-                  </div>
-                )}
-                {activeTab === 'jsx' && (
-                  <div className="absolute inset-0">
-                    <Editor
-                      height="100%"
-                      defaultLanguage="javascript"
-                      value={localJsx}
-                      onChange={(val) => setLocalJsx(val)}
-                      options={{ minimap: { enabled: false }, fontSize: 14, readOnly: !isEditingCode }}
-                    />
-                  </div>
-                )}
-                {activeTab === 'json' && (
-                  <div className="absolute inset-0">
-                    <Editor
-                      height="100%"
-                      defaultLanguage="json"
-                      value={localJson}
-                      onChange={(val) => {
-                        setLocalJson(val);
-                        try { JSON.parse(val); setErrorMsg(''); } catch (e) { setErrorMsg('Invalid JSON'); }
-                      }}
-                      options={{ minimap: { enabled: false }, fontSize: 14, readOnly: !isEditingCode }}
-                    />
                   </div>
                 )}
               </div>
@@ -388,12 +433,22 @@ export default function App() {
           </div>
           <div className="flex-1 relative">
             <DynamicRenderer
-              jsxCode={localJsx}
-              jsonData={(() => {
-                try { return JSON.parse(localJson); } catch (e) { return {}; }
-              })()}
-              onChange={handleRendererChange}
-              onAction={handleRendererAction}
+              jsxCode={componentJsx}
+              jsonData={parsedJsonData}
+              onChange={(path, value) => {
+                if (!parsedJsonData || typeof parsedJsonData !== 'object') return;
+                const newData = { ...parsedJsonData };
+                if (newData[path] !== undefined) newData[path] = value;
+                const newFiles = [...localFiles];
+                const idx = newFiles.findIndex(f => f.name.endsWith('.json') && !f.name.includes('metadata.json'));
+                if (idx > -1) {
+                  newFiles[idx].content = JSON.stringify(newData, null, 2);
+                  setLocalFiles(newFiles);
+                }
+              }}
+              onAction={(actionName, payload) => {
+                toast(`Action Triggered: ${actionName}`, { icon: '⚡' });
+              }}
               onError={(msg) => toast.error(msg)}
             />
           </div>

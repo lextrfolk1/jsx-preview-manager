@@ -54,9 +54,8 @@ app.get('/api/pairs/:pairId/versions/:version/download', async (req, res) => {
     
     const zip = new AdmZip();
     const folderName = `${req.params.pairId}-${req.params.version}`;
-    zip.addFile(`${folderName}/component.jsx`, Buffer.from(v.component || '', 'utf8'));
-    if (v.data !== null) {
-      zip.addFile(`${folderName}/data.json`, Buffer.from(JSON.stringify(v.data, null, 2), 'utf8'));
+    for (const file of v.files) {
+      zip.addFile(`${folderName}/${file.name}`, Buffer.from(file.content || '', 'utf8'));
     }
     
     res.send(zip.toBuffer());
@@ -76,38 +75,31 @@ app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }, { name:
     // create a slug for pairId based on actual name
     const pairId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     
-    let componentStr = 'export default function Component() { return <div>Empty</div>; }';
-    let dataObj = null;
+    let files = [{ name: 'component.jsx', content: 'export default function Component() { return <div>Empty</div>; }' }];
     
     if (req.files['zip']) {
       try {
         const zip = new AdmZip(req.files['zip'][0].buffer);
         const zipEntries = zip.getEntries();
-        const jsxEntry = zipEntries.find(e => !e.isDirectory && (e.entryName.endsWith('.jsx') || e.entryName.endsWith('.js')));
-        if (jsxEntry) {
-          componentStr = zip.readAsText(jsxEntry);
-        }
-        const jsonEntry = zipEntries.find(e => !e.isDirectory && e.entryName.endsWith('.json') && !e.entryName.includes('metadata.json'));
-        if (jsonEntry) {
-          dataObj = JSON.parse(zip.readAsText(jsonEntry));
+        files = [];
+        for (const e of zipEntries) {
+          if (!e.isDirectory && !e.entryName.includes('metadata.json')) {
+            files.push({ name: path.basename(e.entryName), content: zip.readAsText(e) });
+          }
         }
       } catch (err) {
         return res.status(400).json({ error: 'Failed to parse ZIP file: ' + err.message });
       }
     } else {
       if (req.files['jsx']) {
-        componentStr = req.files['jsx'][0].buffer.toString('utf-8');
+        files[0].content = req.files['jsx'][0].buffer.toString('utf-8');
       }
       if (req.files['json']) {
-        try {
-          dataObj = JSON.parse(req.files['json'][0].buffer.toString('utf-8'));
-        } catch (e) {
-          return res.status(400).json({ error: 'Invalid JSON file' });
-        }
+        files.push({ name: 'data.json', content: req.files['json'][0].buffer.toString('utf-8') });
       }
     }
 
-    const pair = await storageService.createPair(pairId, name, description || '', componentStr, dataObj);
+    const pair = await storageService.createPair(pairId, name, description || '', files);
     res.json(pair);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -117,7 +109,7 @@ app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }, { name:
 // POST new version (e.g. from editor or save new version)
 app.post('/api/pairs/:pairId/versions', async (req, res) => {
   try {
-    const { component, data } = req.body;
+    const { files } = req.body;
     const pair = await storageService.getPair(req.params.pairId);
     if (!pair) return res.status(404).json({ error: 'Pair not found' });
     
@@ -129,7 +121,7 @@ app.post('/api/pairs/:pairId/versions', async (req, res) => {
     }
     const nextV = `v${maxV + 1}`;
     
-    const newVersion = await storageService.createVersion(req.params.pairId, nextV, component, data);
+    const newVersion = await storageService.createVersion(req.params.pairId, nextV, files);
     res.json(newVersion);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -139,43 +131,15 @@ app.post('/api/pairs/:pairId/versions', async (req, res) => {
 // POST overwrite current version
 app.post('/api/pairs/:pairId/versions/:version/save', async (req, res) => {
   try {
-    const { component, data } = req.body;
-    const updated = await storageService.saveVersion(req.params.pairId, req.params.version, component, data);
+    const { files } = req.body;
+    const updated = await storageService.saveVersion(req.params.pairId, req.params.version, files);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST save JSON to current version
-app.post('/api/pairs/:pairId/versions/:version/save-json', async (req, res) => {
-  try {
-    const { data } = req.body;
-    const updated = await storageService.saveJSON(req.params.pairId, req.params.version, data);
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
-// POST save JSX (typically creates a new version)
-app.post('/api/pairs/:pairId/versions/:version/save-jsx', async (req, res) => {
-  try {
-    const { component, data } = req.body; // usually requires saving both
-    // Redirect logic to create new version for safety
-    const pair = await storageService.getPair(req.params.pairId);
-    let maxV = 0;
-    for (const v of pair.versions) {
-      const num = parseInt(v.id.replace('v', ''), 10);
-      if (!isNaN(num) && num > maxV) maxV = num;
-    }
-    const nextV = `v${maxV + 1}`;
-    const newVersion = await storageService.createVersion(req.params.pairId, nextV, component, data);
-    res.json(newVersion);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // PUT update pair metadata
 app.put('/api/pairs/:pairId', async (req, res) => {
