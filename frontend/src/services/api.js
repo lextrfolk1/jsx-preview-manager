@@ -17,12 +17,17 @@ export const getPairVersion = async (pairId, version) => {
   return res.data;
 };
 
-export const createPair = async (name, description, jsxFile, jsonFile, zipFile) => {
+export const createPair = async (name, description, files = [], zipFile = null) => {
   const formData = new FormData();
   formData.append('name', name);
   formData.append('description', description || '');
-  if (jsxFile) formData.append('jsx', jsxFile);
-  if (jsonFile) formData.append('json', jsonFile);
+  
+  if (files && files.length > 0) {
+    for (const f of files) {
+      formData.append('files', f);
+    }
+  }
+  
   if (zipFile) formData.append('zip', zipFile);
   
   const res = await axios.post(API_BASE, formData, {
@@ -31,18 +36,13 @@ export const createPair = async (name, description, jsxFile, jsonFile, zipFile) 
   return res.data;
 };
 
-export const saveVersion = async (pairId, version, component, data) => {
-  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save`, { component, data });
+export const saveVersion = async (pairId, version, files) => {
+  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save`, { files });
   return res.data;
 };
 
-export const saveJson = async (pairId, version, data) => {
-  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save-json`, { data });
-  return res.data;
-};
-
-export const saveJsx = async (pairId, version, component, data) => {
-  const res = await axios.post(`${API_BASE}/${pairId}/versions/${version}/save-jsx`, { component, data });
+export const createVersion = async (pairId, files) => {
+  const res = await axios.post(`${API_BASE}/${pairId}/versions`, { files });
   return res.data;
 };
 

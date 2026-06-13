@@ -52,21 +52,22 @@ async function getPairVersion(pairId, version) {
   const dir = path.join(STORAGE_DIR, pairId, version);
   if (!(await fs.pathExists(dir))) return null;
   
-  const componentPath = path.join(dir, 'component.jsx');
-  const dataPath = path.join(dir, 'data.json');
-  const metadataPath = path.join(dir, 'metadata.json');
-  
-  const component = await fs.readFile(componentPath, 'utf-8').catch(() => '');
-  let data = null;
-  if (await fs.pathExists(dataPath)) {
-    data = await fs.readJson(dataPath).catch(() => null);
+  const files = [];
+  const dirFiles = await fs.readdir(dir);
+  for (const file of dirFiles) {
+    if (file !== 'metadata.json') {
+      const content = await fs.readFile(path.join(dir, file), 'utf-8');
+      files.push({ name: file, content });
+    }
   }
+  
+  const metadataPath = path.join(dir, 'metadata.json');
   const metadata = await fs.readJson(metadataPath).catch(() => ({}));
   
-  return { component, data, metadata };
+  return { files, metadata };
 }
 
-async function createPair(pairId, name, description, componentStr, dataObj) {
+async function createPair(pairId, name, description, files) {
   await ensureStorage();
   const p = path.join(STORAGE_DIR, pairId);
   if (await fs.pathExists(p)) throw new Error('Pair already exists');
@@ -79,18 +80,18 @@ async function createPair(pairId, name, description, componentStr, dataObj) {
     activeVersion: 'v1'
   }, { spaces: 2 });
   
-  await createVersion(pairId, 'v1', componentStr, dataObj);
+  await createVersion(pairId, 'v1', files);
   return await getPair(pairId);
 }
 
-async function createVersion(pairId, versionId, componentStr, dataObj) {
+async function createVersion(pairId, versionId, files) {
   const dir = path.join(STORAGE_DIR, pairId, versionId);
   await fs.ensureDir(dir);
   
-  await fs.writeFile(path.join(dir, 'component.jsx'), componentStr);
-  if (dataObj !== null && dataObj !== undefined) {
-    await fs.writeJson(path.join(dir, 'data.json'), dataObj, { spaces: 2 });
+  for (const file of files) {
+    await fs.writeFile(path.join(dir, file.name), file.content);
   }
+  
   await fs.writeJson(path.join(dir, 'metadata.json'), {
     createdAt: new Date().toISOString(),
     id: versionId
@@ -106,12 +107,20 @@ async function createVersion(pairId, versionId, componentStr, dataObj) {
   return await getPairVersion(pairId, versionId);
 }
 
-async function saveVersion(pairId, versionId, componentStr, dataObj) {
+async function saveVersion(pairId, versionId, files) {
   const dir = path.join(STORAGE_DIR, pairId, versionId);
   if (!(await fs.pathExists(dir))) throw new Error('Version not found');
-  await fs.writeFile(path.join(dir, 'component.jsx'), componentStr);
-  if (dataObj !== null && dataObj !== undefined) {
-    await fs.writeJson(path.join(dir, 'data.json'), dataObj, { spaces: 2 });
+  
+  const existingFiles = await fs.readdir(dir);
+  const newFilenames = files.map(f => f.name);
+  for (const file of existingFiles) {
+    if (file !== 'metadata.json' && !newFilenames.includes(file)) {
+      await fs.remove(path.join(dir, file));
+    }
+  }
+  
+  for (const file of files) {
+    await fs.writeFile(path.join(dir, file.name), file.content);
   }
   
   const pairMeta = path.join(STORAGE_DIR, pairId, 'metadata.json');
@@ -120,13 +129,6 @@ async function saveVersion(pairId, versionId, componentStr, dataObj) {
   await fs.writeJson(pairMeta, meta, { spaces: 2 });
   
   return await getPairVersion(pairId, versionId);
-}
-
-async function saveJSON(pairId, version, dataObj) {
-  const dir = path.join(STORAGE_DIR, pairId, version);
-  if (!(await fs.pathExists(dir))) throw new Error('Version not found');
-  await fs.writeJson(path.join(dir, 'data.json'), dataObj, { spaces: 2 });
-  return await getPairVersion(pairId, version);
 }
 
 async function deletePair(pairId) {
@@ -154,7 +156,6 @@ module.exports = {
   createPair,
   createVersion,
   saveVersion,
-  saveJSON,
   deletePair,
   deleteVersion,
   updatePairMetadata
