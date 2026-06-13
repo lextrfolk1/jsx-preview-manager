@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  backend:
+    image: node:18-alpine
+    working_dir: /app/backend
+    volumes:
+      - .:/app
+    ports:
+      - "3001:3001"
+    command: node server.js
+    environment:
+      - PORT=3001
+
+  frontend:
+    image: node:18-alpine
+    working_dir: /app/frontend
+    volumes:
+      - .:/app
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host

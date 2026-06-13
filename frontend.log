@@ -1,0 +1,51 @@
+
+> frontend@0.0.0 dev
+> vite
+
+
+  VITE v8.0.16  ready in 218 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+11:46:33 AM [vite] (client) hmr update /src/index.css
+11:46:54 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+11:46:55 AM [vite] (client) [optimizer] bundling dependencies...
+11:46:55 AM [vite] (client) ✨ new dependencies optimized: react-hot-toast
+11:46:55 AM [vite] (client) ✨ optimized dependencies changed. reloading
+11:46:55 AM [vite] (client) [console.error] Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:
+1. You might have mismatching versions of React and the renderer (such as React DOM)
+2. You might be breaking the Rules of Hooks
+3. You might have more than one copy of React in the same app
+See https://react.dev/link/invalid-hook-call for tips about how to debug and fix this problem.
+11:46:55 AM [vite] (client) [console.error] Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:
+1. You might have mismatching versions of React and the renderer (such as React DOM)
+2. You might be breaking the Rules of Hooks
+3. You might have more than one copy of React in the same app
+See https://react.dev/link/invalid-hook-call for tips about how to debug and fix this problem.
+11:46:55 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'useState')
+ > exports.useState node_modules/react/cjs/react.development.js:1263:33
+ > V node_modules/.vite/deps/react-hot-toast.js?v=d07104e4:163:41
+ > w node_modules/.vite/deps/react-hot-toast.js?v=d07104e4:250:35
+ > Fe node_modules/.vite/deps/react-hot-toast.js?v=d07104e4:552:35
+ > Object.react_stack_bottom_frame node_modules/.vite/deps/react-dom_client.js?v=388bacef:12868:12
+ > renderWithHooks node_modules/.vite/deps/react-dom_client.js?v=388bacef:4213:19
+ > updateFunctionComponent node_modules/.vite/deps/react-dom_client.js?v=388bacef:5569:16
+ > beginWork node_modules/.vite/deps/react-dom_client.js?v=388bacef:6140:20
+ > runWithFiberInDEV node_modules/.vite/deps/react-dom_client.js?v=388bacef:851:66
+ > performUnitOfWork node_modules/.vite/deps/react-dom_client.js?v=388bacef:8429:92
+ > workLoopSync node_modules/.vite/deps/react-dom_client.js?v=388bacef:8325:37
+ > renderRootSync node_modules/.vite/deps/react-dom_client.js?v=388bacef:8309:6
+ > performWorkOnRoot node_modules/.vite/deps/react-dom_client.js?v=388bacef:7994:27
+ > performSyncWorkOnRoot node_modules/.vite/deps/react-dom_client.js?v=388bacef:9067:4
+ > flushSyncWorkAcrossRoots_impl node_modules/.vite/deps/react-dom_client.js?v=388bacef:8984:302
+ > flushSyncWork$1 node_modules/.vite/deps/react-dom_client.js?v=388bacef:8122:81
+ > Object.scheduleRefresh node_modules/.vite/deps/react-dom_client.js?v=388bacef:328:5
+ > ../../../../../../../@react-refresh:228:17
+ > performReactRefresh ../../../../../../../@react-refresh:217:26
+ > ../../../../../../../@react-refresh:604:3
+
+11:46:55 AM [vite] (client) [console.warn] An error occurred in the <Fe> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
