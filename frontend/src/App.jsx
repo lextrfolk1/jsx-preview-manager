@@ -76,9 +76,9 @@ export default function App() {
       setUploadForm({ name: '', desc: '', jsxFile: null, jsonFile: null, zipFile: null });
       await loadPairs();
       setSelectedPairId(p.id);
-      toast.success('Pair created successfully!');
+      toast.success('Component created successfully!');
     } catch (err) {
-      toast.error('Failed to create pair: ' + err.message);
+      toast.error('Failed to create component: ' + err.message);
     }
   };
 
@@ -92,9 +92,9 @@ export default function App() {
       }
       loadPairs();
       setPairToDelete(null);
-      toast.success('Pair deleted');
+      toast.success('Component deleted');
     } catch (err) {
-      toast.error('Failed to delete pair: ' + err.message);
+      toast.error('Failed to delete component: ' + err.message);
     }
   };
 
@@ -201,7 +201,7 @@ export default function App() {
             onClick={() => setShowUpload(true)}
             className="w-full flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 py-2.5 px-4 rounded-lg hover:bg-indigo-100 hover:text-indigo-800 text-sm font-semibold transition-all"
           >
-            <FilePlus size={16} /> New Pair
+            <FilePlus size={16} /> New Component
           </button>
         </div>
 
@@ -387,7 +387,7 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-[480px] overflow-hidden transform transition-all">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Create New Pair</h2>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Create New Component</h2>
               <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <X size={20} />
               </button>
@@ -396,7 +396,7 @@ export default function App() {
             <form onSubmit={handleCreatePair} className="p-6 space-y-6">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pair Name *</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Component Name *</label>
                   <input required type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow" value={uploadForm.name} onChange={e => setUploadForm({...uploadForm, name: e.target.value})} placeholder="e.g. user-dashboard" />
                 </div>
                 <div>
@@ -416,7 +416,7 @@ export default function App() {
                     <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative">
                       <label className="flex flex-col items-center justify-center cursor-pointer">
                         <Code className="text-indigo-400 mb-2" size={24} />
-                        <span className="text-sm font-medium text-slate-700">Select JSX File</span>
+                        <span className="text-sm font-medium text-slate-700">Component File (JSX)</span>
                         <span className="text-xs text-slate-500 mt-1">{uploadForm.jsxFile ? uploadForm.jsxFile.name : 'No file chosen'}</span>
                         <input type="file" accept=".jsx,.js" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, jsxFile: e.target.files[0]})} />
                       </label>
@@ -424,7 +424,7 @@ export default function App() {
                     <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative">
                       <label className="flex flex-col items-center justify-center cursor-pointer">
                         <Database className="text-emerald-400 mb-2" size={24} />
-                        <span className="text-sm font-medium text-slate-700">Select JSON File</span>
+                        <span className="text-sm font-medium text-slate-700">Optional Data (JSON)</span>
                         <span className="text-xs text-slate-500 mt-1">{uploadForm.jsonFile ? uploadForm.jsonFile.name : 'No file chosen'}</span>
                         <input type="file" accept=".json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, jsonFile: e.target.files[0]})} />
                       </label>
@@ -443,7 +443,7 @@ export default function App() {
 
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowUpload(false)} className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" className="px-5 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm hover:shadow transition-all">Create Pair</button>
+                <button type="submit" className="px-5 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm hover:shadow transition-all">Create Component</button>
               </div>
             </form>
           </div>
@@ -454,8 +454,8 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-[400px] overflow-hidden transform transition-all">
             <div className="p-6">
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight mb-2">Delete Pair?</h2>
-              <p className="text-sm text-slate-600 mb-6">Are you sure you want to completely delete this pair? This action cannot be undone.</p>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight mb-2">Delete Component?</h2>
+              <p className="text-sm text-slate-600 mb-6">Are you sure you want to completely delete this component? This action cannot be undone.</p>
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => setPairToDelete(null)} className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
                 <button type="button" onClick={confirmDeletePair} className="px-5 py-2.5 text-sm font-medium bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow-sm hover:shadow transition-all">Delete</button>
