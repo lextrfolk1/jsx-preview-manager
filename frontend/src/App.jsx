@@ -12,7 +12,11 @@ export default function App() {
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [versionData, setVersionData] = useState({ files: [], metadata: {} });
   const [activeTab, setActiveTab] = useState('preview');
+  const [openFiles, setOpenFiles] = useState([]);
   const [isFileTreeExpanded, setIsFileTreeExpanded] = useState(false);
+  const [isAddingFile, setIsAddingFile] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+  const [fileToDelete, setFileToDelete] = useState(null);
   
   const [errorMsg, setErrorMsg] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -151,17 +155,24 @@ export default function App() {
     }
   };
 
-  const handleAddNewFile = () => {
-    const filename = prompt('Enter filename (e.g. data.json):');
-    if (!filename) return;
-    if (localFiles.find(f => f.name === filename)) {
+  const commitNewFile = (filename) => {
+    if (!filename || !filename.trim()) {
+      setIsAddingFile(false);
+      setNewFileName('');
+      return;
+    }
+    const finalName = filename.trim();
+    if (localFiles.find(f => f.name === finalName)) {
       toast.error('File already exists');
       return;
     }
-    const newFiles = [...localFiles, { name: filename, content: filename.endsWith('.json') ? '{}' : '' }];
+    const newFiles = [...localFiles, { name: finalName, content: finalName.endsWith('.json') ? '{}' : '' }];
     setLocalFiles(newFiles);
-    setSelectedFileName(filename);
-    setActiveTab(filename);
+    setSelectedFileName(finalName);
+    if (!openFiles.includes(finalName)) setOpenFiles([...openFiles, finalName]);
+    setActiveTab(finalName);
+    setIsAddingFile(false);
+    setNewFileName('');
   };
 
   const handleDownloadZip = () => {
@@ -207,6 +218,7 @@ export default function App() {
                     setIsFileTreeExpanded(false);
                     setSelectedVersion(p.activeVersion || p.versions[p.versions.length-1]?.id);
                     setActiveTab('preview');
+                    setOpenFiles([]);
                   }
                 }}
               >
@@ -235,7 +247,12 @@ export default function App() {
                       <div 
                         key={f.name}
                         className={`text-[13px] py-1 px-2 ml-6 rounded cursor-pointer flex items-center justify-between group/file transition-colors ${selectedFileName === f.name ? 'bg-slate-200/60 text-slate-900 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
-                        onClick={(e) => { e.stopPropagation(); setSelectedFileName(f.name); setActiveTab(f.name); }}
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setSelectedFileName(f.name); 
+                          if (!openFiles.includes(f.name)) setOpenFiles([...openFiles, f.name]);
+                          setActiveTab(f.name); 
+                        }}
                       >
                         <div className="flex items-center gap-2">
                            <Code size={13} className={selectedFileName === f.name ? 'text-indigo-500' : 'text-slate-400'} />
@@ -246,29 +263,39 @@ export default function App() {
                            className={`opacity-0 group-hover/file:opacity-100 p-1 rounded transition-colors ${selectedFileName === f.name ? 'text-slate-500 hover:text-rose-600' : 'text-slate-400 hover:text-rose-600'}`}
                            onClick={(e) => {
                              e.stopPropagation();
-                             if (window.confirm(`Delete ${f.name}?`)) {
-                               const newFiles = localFiles.filter(lf => lf.name !== f.name);
-                               setLocalFiles(newFiles);
-                               if (selectedFileName === f.name) {
-                                 setSelectedFileName('');
-                                 setActiveTab('preview');
-                               }
-                               saveVersion(selectedPairId, selectedVersion, newFiles).then(() => {
-                                  toast.success(`${f.name} deleted`);
-                               });
-                             }
+                             setFileToDelete(f.name);
                            }}
                         >
                            <Trash2 size={12} />
                         </button>
                       </div>
                     ))}
-                    <button 
-                      className="text-[13px] mt-1 ml-6 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium py-1 px-2 rounded flex items-center gap-2 w-[calc(100%-1.5rem)] transition-colors"
-                      onClick={(e) => { e.stopPropagation(); handleAddNewFile(); }}
-                    >
-                      <FilePlus size={13} /> <span className="opacity-80">Add File</span>
-                    </button>
+                    {isAddingFile && (
+                      <div className="flex items-center gap-2 py-1 px-2 ml-6 bg-slate-50 rounded">
+                        <Code size={13} className="text-slate-400" />
+                        <input 
+                          autoFocus
+                          type="text"
+                          value={newFileName}
+                          onChange={e => setNewFileName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitNewFile(newFileName);
+                            if (e.key === 'Escape') { setIsAddingFile(false); setNewFileName(''); }
+                          }}
+                          onBlur={() => commitNewFile(newFileName)}
+                          className="flex-1 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-[13px] outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                          placeholder="filename.jsx"
+                        />
+                      </div>
+                    )}
+                    {!isAddingFile && (
+                      <button 
+                        className="text-[13px] mt-1 ml-6 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium py-1 px-2 rounded flex items-center gap-2 w-[calc(100%-1.5rem)] transition-colors"
+                        onClick={(e) => { e.stopPropagation(); setIsAddingFile(true); setNewFileName(''); }}
+                      >
+                        <FilePlus size={13} /> <span className="opacity-80">Add File</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -323,14 +350,27 @@ export default function App() {
                 
                 <div className="w-px h-6 bg-slate-200 mx-2 mb-3"></div>
                 
-                {localFiles.map(f => (
-                  <button 
-                    key={f.name}
-                    className={`px-5 py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === f.name ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
-                    onClick={() => { setActiveTab(f.name); setSelectedFileName(f.name); }}
+                {openFiles.map(filename => (
+                  <div 
+                    key={filename}
+                    className={`px-4 py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer group/tab ${activeTab === filename ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
+                    onClick={() => { setActiveTab(filename); setSelectedFileName(filename); }}
                   >
-                    <Code size={16} className={activeTab === f.name ? 'text-indigo-500' : 'text-slate-400'} /> {f.name}
-                  </button>
+                    <Code size={16} className={activeTab === filename ? 'text-indigo-500' : 'text-slate-400'} /> {filename}
+                    <button 
+                      className={`ml-1 p-0.5 rounded-full hover:bg-slate-200 transition-colors ${activeTab === filename ? 'text-indigo-400 hover:text-indigo-700' : 'text-slate-300 hover:text-slate-600 opacity-0 group-hover/tab:opacity-100'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newOpen = openFiles.filter(name => name !== filename);
+                        setOpenFiles(newOpen);
+                        if (activeTab === filename) {
+                          setActiveTab('preview');
+                        }
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -533,6 +573,45 @@ export default function App() {
                 <button type="button" onClick={() => setPairToDelete(null)} className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
                 <button type="button" onClick={confirmDeletePair} className="px-5 py-2.5 text-sm font-medium bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow-sm hover:shadow transition-all">Delete</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE FILE MODAL */}
+      {fileToDelete && (
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-50 p-4 transition-all">
+          <div className="bg-white rounded-2xl shadow-2xl w-[400px] overflow-hidden transform transition-all">
+            <div className="p-6 border-b border-slate-100 flex items-start gap-3">
+              <div className="bg-rose-100 p-2 rounded-full text-rose-600 mt-0.5">
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 tracking-tight mb-1">Delete File?</h2>
+                <p className="text-sm text-slate-600">Are you sure you want to delete <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-slate-800">{fileToDelete}</span>? This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 flex justify-end gap-3">
+              <button type="button" onClick={() => setFileToDelete(null)} className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">Cancel</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  const newFiles = localFiles.filter(lf => lf.name !== fileToDelete);
+                  setLocalFiles(newFiles);
+                  if (selectedFileName === fileToDelete) {
+                    setSelectedFileName('');
+                    setActiveTab('preview');
+                  }
+                  setOpenFiles(prev => prev.filter(name => name !== fileToDelete));
+                  saveVersion(selectedPairId, selectedVersion, newFiles).then(() => {
+                    toast.success(`${fileToDelete} deleted`);
+                    setFileToDelete(null);
+                  });
+                }} 
+                className="px-5 py-2.5 text-sm font-medium bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow-sm hover:shadow transition-all"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
