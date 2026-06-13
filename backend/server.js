@@ -55,7 +55,9 @@ app.get('/api/pairs/:pairId/versions/:version/download', async (req, res) => {
     const zip = new AdmZip();
     const folderName = `${req.params.pairId}-${req.params.version}`;
     zip.addFile(`${folderName}/component.jsx`, Buffer.from(v.component || '', 'utf8'));
-    zip.addFile(`${folderName}/data.json`, Buffer.from(JSON.stringify(v.data || {}, null, 2), 'utf8'));
+    if (v.data !== null) {
+      zip.addFile(`${folderName}/data.json`, Buffer.from(JSON.stringify(v.data, null, 2), 'utf8'));
+    }
     
     res.send(zip.toBuffer());
   } catch (err) {
@@ -75,7 +77,7 @@ app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }, { name:
     const pairId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     
     let componentStr = 'export default function Component() { return <div>Empty</div>; }';
-    let dataObj = {};
+    let dataObj = null;
     
     if (req.files['zip']) {
       try {

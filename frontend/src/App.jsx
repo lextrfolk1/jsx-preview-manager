@@ -22,6 +22,7 @@ export default function App() {
   const [localJson, setLocalJson] = useState('{}');
 
   const parsedJsonData = useMemo(() => {
+    if (localJson === null) return null;
     try { return JSON.parse(localJson); } catch (e) { return {}; }
   }, [localJson]);
   
@@ -64,7 +65,10 @@ export default function App() {
     const data = await getPairVersion(pairId, version);
     setVersionData(data);
     setLocalJsx(data.component);
-    setLocalJson(JSON.stringify(data.data, null, 2));
+    setLocalJson(data.data !== null ? JSON.stringify(data.data, null, 2) : null);
+    if (activeTab === 'json' && data.data === null) {
+      setActiveTab('preview');
+    }
     setErrorMsg('');
   };
 
@@ -112,7 +116,7 @@ export default function App() {
 
   const handleSaveCurrentVersion = async () => {
     try {
-      let parsedJson = JSON.parse(localJson);
+      let parsedJson = localJson !== null ? JSON.parse(localJson) : null;
       await saveVersion(selectedPairId, selectedVersion, localJsx, parsedJson);
       loadVersionData(selectedPairId, selectedVersion);
       setErrorMsg('');
@@ -131,7 +135,7 @@ export default function App() {
 
     const timer = setTimeout(async () => {
       try {
-        let parsedJson = JSON.parse(localJson);
+        let parsedJson = localJson !== null ? JSON.parse(localJson) : null;
         await saveVersion(selectedPairId, selectedVersion, localJsx, parsedJson);
         // Silently saved, don't show toast to avoid spam
       } catch (err) {
@@ -144,7 +148,7 @@ export default function App() {
 
   const handleJsxSaveNewVersion = async () => {
     try {
-      let parsedJson = JSON.parse(localJson);
+      let parsedJson = localJson !== null ? JSON.parse(localJson) : null;
       const newVersion = await saveJsx(selectedPairId, selectedVersion, localJsx, parsedJson);
       await loadPairData(selectedPairId);
       setSelectedVersion(newVersion.metadata?.id || newVersion.id); // switch to new version
@@ -275,14 +279,28 @@ export default function App() {
                   className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'jsx' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
                   onClick={() => setActiveTab('jsx')}
                 >
-                  <Code size={16} /> JSX Editor
+                  <Code size={16} /> Component JSX
                 </button>
-                <button 
-                  className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'json' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
-                  onClick={() => setActiveTab('json')}
-                >
-                  <FileJson size={16} /> JSON Data
-                </button>
+                {localJson !== null && (
+                  <button 
+                    className={`py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${activeTab === 'json' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
+                    onClick={() => setActiveTab('json')}
+                  >
+                    <FileJson size={16} /> Data JSON
+                  </button>
+                )}
+                {localJson === null && (
+                  <button 
+                    className="py-3.5 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-emerald-600 hover:text-emerald-700 hover:border-emerald-200 transition-all"
+                    onClick={async () => {
+                      await saveJson(selectedPairId, selectedVersion, {});
+                      await loadVersionData(selectedPairId, selectedVersion);
+                      setActiveTab('json');
+                    }}
+                  >
+                    <FilePlus size={16} /> Add data.json
+                  </button>
+                )}
               </div>
 
               {(activeTab === 'jsx' || activeTab === 'json') && (

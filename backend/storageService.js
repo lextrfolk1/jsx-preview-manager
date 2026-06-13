@@ -57,7 +57,10 @@ async function getPairVersion(pairId, version) {
   const metadataPath = path.join(dir, 'metadata.json');
   
   const component = await fs.readFile(componentPath, 'utf-8').catch(() => '');
-  const data = await fs.readJson(dataPath).catch(() => ({}));
+  let data = null;
+  if (await fs.pathExists(dataPath)) {
+    data = await fs.readJson(dataPath).catch(() => null);
+  }
   const metadata = await fs.readJson(metadataPath).catch(() => ({}));
   
   return { component, data, metadata };
@@ -85,7 +88,9 @@ async function createVersion(pairId, versionId, componentStr, dataObj) {
   await fs.ensureDir(dir);
   
   await fs.writeFile(path.join(dir, 'component.jsx'), componentStr);
-  await fs.writeJson(path.join(dir, 'data.json'), dataObj, { spaces: 2 });
+  if (dataObj !== null && dataObj !== undefined) {
+    await fs.writeJson(path.join(dir, 'data.json'), dataObj, { spaces: 2 });
+  }
   await fs.writeJson(path.join(dir, 'metadata.json'), {
     createdAt: new Date().toISOString(),
     id: versionId
@@ -105,7 +110,9 @@ async function saveVersion(pairId, versionId, componentStr, dataObj) {
   const dir = path.join(STORAGE_DIR, pairId, versionId);
   if (!(await fs.pathExists(dir))) throw new Error('Version not found');
   await fs.writeFile(path.join(dir, 'component.jsx'), componentStr);
-  await fs.writeJson(path.join(dir, 'data.json'), dataObj, { spaces: 2 });
+  if (dataObj !== null && dataObj !== undefined) {
+    await fs.writeJson(path.join(dir, 'data.json'), dataObj, { spaces: 2 });
+  }
   
   const pairMeta = path.join(STORAGE_DIR, pairId, 'metadata.json');
   const meta = await fs.readJson(pairMeta);
