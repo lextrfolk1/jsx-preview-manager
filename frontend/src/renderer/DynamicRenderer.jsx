@@ -1,5 +1,12 @@
 import React, { useEffect, useRef } from 'react';
+import * as ReactDOMClient from 'react-dom/client';
 import * as Babel from '@babel/standalone';
+import * as LucideReact from 'lucide-react';
+
+// Expose to iframe sandbox
+window.React = React;
+window.ReactDOM = ReactDOMClient;
+window.LucideReact = LucideReact;
 
 export default function DynamicRenderer({ files = [], jsonData, onChange, onAction, onError }) {
   const iframeRef = useRef(null);
@@ -59,8 +66,6 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
       <!DOCTYPE html>
       <html>
         <head>
-          <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-          <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
           <script src="https://cdn.tailwindcss.com"></script>
           <style>body { margin: 0; padding: 1rem; font-family: sans-serif; }</style>
         </head>
@@ -72,14 +77,19 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
             };
             
             try {
+              // Babel's classic JSX runtime needs a global 'React'
+              window.React = window.parent.React;
+              window.ReactDOM = window.parent.ReactDOM;
+              
               const modules = {
                 ${moduleDefinitions}
               };
               const moduleCache = {};
               
               const require = (mod) => {
-                if (mod === 'react') return window.React;
-                if (mod === 'react-dom') return window.ReactDOM;
+                if (mod === 'react') return window.parent.React;
+                if (mod === 'react-dom') return window.parent.ReactDOM;
+                if (mod === 'lucide-react') return window.parent.LucideReact;
                 
                 let target = mod;
                 if (target.startsWith('./')) target = target.slice(2);
@@ -109,7 +119,7 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
                 window.parent.postMessage({ source: 'dynamic-preview', type: 'onAction', actionName, payload }, '*');
               };
               
-              const root = ReactDOM.createRoot(document.getElementById('root'));
+              const root = window.parent.ReactDOM.createRoot(document.getElementById('root'));
               
               // Evaluate entry module
               const entryModule = { exports: {} };
@@ -130,7 +140,7 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
               }
               
               if (ComponentToRender && (typeof ComponentToRender === 'function' || (typeof ComponentToRender === 'object' && ComponentToRender.$$typeof))) {
-                 root.render(React.createElement(ComponentToRender, { data, onChange, onAction }));
+                 root.render(window.parent.React.createElement(ComponentToRender, { data, onChange, onAction }));
               } else {
                  throw new Error("Could not find a valid React component in ${entryPointName}. Ensure your code has 'export default YourComponent;'.");
               }
