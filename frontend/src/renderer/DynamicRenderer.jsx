@@ -1,14 +1,31 @@
 import React, { useEffect, useRef } from 'react';
 import * as ReactDOMClient from 'react-dom/client';
+import * as ReactDOM from 'react-dom';
 import * as Babel from '@babel/standalone';
 import * as LucideReact from 'lucide-react';
 
 // Expose to iframe sandbox
 window.React = React;
-window.ReactDOM = ReactDOMClient;
+window.ReactDOM = ReactDOM;
+window.ReactDOMClient = ReactDOMClient;
 window.LucideReact = LucideReact;
 
-export default function DynamicRenderer({ files = [], jsonData, onChange, onAction, onError }) {
+let reactBlobUrl = '';
+let reactDomBlobUrl = '';
+let reactDomClientBlobUrl = '';
+
+if (typeof URL !== 'undefined') {
+  const reactExports = Object.keys(React).map(k => `export const ${k} = window.parent.React.${k};`).join('\n');
+  reactBlobUrl = URL.createObjectURL(new Blob([`export default window.parent.React;\n${reactExports}`], { type: 'text/javascript' }));
+  
+  const reactDomExports = Object.keys(ReactDOM).map(k => `export const ${k} = window.parent.ReactDOM.${k};`).join('\n');
+  reactDomBlobUrl = URL.createObjectURL(new Blob([`export default window.parent.ReactDOM;\n${reactDomExports}`], { type: 'text/javascript' }));
+
+  const reactDomClientExports = Object.keys(ReactDOMClient).map(k => `export const ${k} = window.parent.ReactDOMClient.${k};`).join('\n');
+  reactDomClientBlobUrl = URL.createObjectURL(new Blob([`export default window.parent.ReactDOMClient;\n${reactDomClientExports}`], { type: 'text/javascript' }));
+}
+
+export default function DynamicRenderer({ files = [], jsonData, dependencies = [], onChange, onAction, onError, onMissingDependency }) {
   const iframeRef = useRef(null);
 
   useEffect(() => {
@@ -21,12 +38,14 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
         onAction && onAction(e.data.actionName, e.data.payload);
       } else if (e.data.type === 'error') {
         onError && onError(e.data.message);
+      } else if (e.data.type === 'missing_dependency') {
+        onMissingDependency && onMissingDependency(e.data.module);
       }
     };
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onChange, onAction, onError]);
+  }, [onChange, onAction, onError, onMissingDependency]);
 
   useEffect(() => {
     if (!files || files.length === 0) return;
@@ -66,20 +85,49 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
       <!DOCTYPE html>
       <html>
         <head>
+          <script type="importmap">
+            {
+              "imports": {
+                "react": "${reactBlobUrl}",
+                "react-dom": "${reactDomBlobUrl}",
+                "react-dom/client": "${reactDomClientBlobUrl}"
+              }
+            }
+          </script>
           <script src="https://cdn.tailwindcss.com"></script>
           <style>body { margin: 0; padding: 1rem; font-family: sans-serif; }</style>
         </head>
         <body>
           <div id="root"></div>
+          <script type="module">
+            window.DynamicModules = window.DynamicModules || {};
+            const deps = ${JSON.stringify(dependencies || [])};
+            
+            if (deps.length === 0) {
+               window.dispatchEvent(new Event('dependencies-ready'));
+            } else {
+               Promise.all(
+                 deps.map(dep => import('https://esm.sh/' + dep + '?external=react,react-dom')
+                   .then(m => window.DynamicModules[dep] = m)
+                 )
+               ).then(() => {
+                 window.dispatchEvent(new Event('dependencies-ready'));
+               }).catch(err => {
+                 window.parent.postMessage({ source: 'dynamic-preview', type: 'error', message: 'Failed to load dependencies: ' + err.message }, '*');
+               });
+            }
+          </script>
           <script>
             window.onerror = function(msg) {
               window.parent.postMessage({ source: 'dynamic-preview', type: 'error', message: msg }, '*');
             };
             
-            try {
-              // Babel's classic JSX runtime needs a global 'React'
-              window.React = window.parent.React;
-              window.ReactDOM = window.parent.ReactDOM;
+            window.addEventListener('dependencies-ready', () => {
+              try {
+                // Babel's classic JSX runtime needs a global 'React'
+                window.React = window.parent.React;
+                window.ReactDOM = window.parent.ReactDOM;
+                window.ReactDOMClient = window.parent.ReactDOMClient;
               
               const modules = {
                 ${moduleDefinitions}
@@ -90,6 +138,7 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
                 if (mod === 'react') return window.parent.React;
                 if (mod === 'react-dom') return window.parent.ReactDOM;
                 if (mod === 'lucide-react') return window.parent.LucideReact;
+                if (window.DynamicModules && window.DynamicModules[mod]) return window.DynamicModules[mod];
                 
                 let target = mod;
                 if (target.startsWith('./')) target = target.slice(2);
@@ -105,8 +154,8 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
                   return newModule.exports;
                 }
                 
-                console.warn('Module not found: ' + mod);
-                return {};
+                window.parent.postMessage({ source: 'dynamic-preview', type: 'missing_dependency', module: mod }, '*');
+                throw new Error('Missing dependency: ' + mod);
               };
               
               const data = ${JSON.stringify(jsonData || {})};
@@ -119,7 +168,7 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
                 window.parent.postMessage({ source: 'dynamic-preview', type: 'onAction', actionName, payload }, '*');
               };
               
-              const root = window.parent.ReactDOM.createRoot(document.getElementById('root'));
+              const root = window.parent.ReactDOMClient.createRoot(document.getElementById('root'));
               
               // Evaluate entry module
               const entryModule = { exports: {} };
@@ -147,6 +196,7 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
             } catch (err) {
               window.parent.postMessage({ source: 'dynamic-preview', type: 'error', message: err.message }, '*');
             }
+          });
           </script>
         </body>
       </html>
@@ -155,7 +205,7 @@ export default function DynamicRenderer({ files = [], jsonData, onChange, onActi
     if (iframeRef.current) {
        iframeRef.current.srcdoc = html;
     }
-  }, [files, jsonData, onError]);
+  }, [files, jsonData, dependencies, onError]);
 
   return (
     <iframe

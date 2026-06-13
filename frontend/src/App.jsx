@@ -40,6 +40,16 @@ export default function App() {
   const [uploadForm, setUploadForm] = useState({ name: '', desc: '', files: [], zipFile: null });
   const [pairToDelete, setPairToDelete] = useState(null);
 
+  // Dynamic dependencies
+  const [missingModule, setMissingModule] = useState(null);
+  const [dependencies, setDependencies] = useState([]);
+
+  const handleMissingDependency = (mod) => {
+    if (!dependencies.includes(mod)) {
+      setMissingModule(mod);
+    }
+  };
+
   useEffect(() => {
     loadPairs();
   }, []);
@@ -432,6 +442,8 @@ export default function App() {
                       <DynamicRenderer
                         files={localFiles}
                         jsonData={parsedJsonData}
+                        dependencies={dependencies}
+                        onMissingDependency={handleMissingDependency}
                         onChange={(path, value) => {
                           if (!parsedJsonData || typeof parsedJsonData !== 'object') return;
                           const newData = { ...parsedJsonData };
@@ -475,6 +487,8 @@ export default function App() {
             <DynamicRenderer
               files={localFiles}
               jsonData={parsedJsonData}
+              dependencies={dependencies}
+              onMissingDependency={handleMissingDependency}
               onChange={(path, value) => {
                 if (!parsedJsonData || typeof parsedJsonData !== 'object') return;
                 const newData = { ...parsedJsonData };
@@ -607,6 +621,32 @@ export default function App() {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MISSING DEPENDENCY MODAL */}
+      {missingModule && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center backdrop-blur-sm p-4">
+          <div className="bg-[#1e1e1e] border border-zinc-800 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
+              <h3 className="font-semibold text-zinc-100 flex items-center gap-2">
+                <AlertCircle size={18} className="text-amber-500" />
+                Missing Dependency
+              </h3>
+            </div>
+            <div className="p-6 text-zinc-300 text-sm">
+              <p>The component requires the package <span className="font-mono text-teal-400 bg-teal-400/10 px-1 py-0.5 rounded">{missingModule}</span> to render.</p>
+              <p className="mt-2 text-zinc-400">Would you like to dynamically load it?</p>
+            </div>
+            <div className="px-6 py-4 border-t border-zinc-800 flex justify-end gap-3 bg-black/20">
+              <button onClick={() => setMissingModule(null)} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">Cancel</button>
+              <button onClick={() => {
+                setDependencies(prev => [...prev, missingModule]);
+                setMissingModule(null);
+                toast.success(`Loading ${missingModule}...`);
+              }} className="px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-500 text-white rounded-lg transition-colors">Load Package</button>
             </div>
           </div>
         </div>
