@@ -67,7 +67,7 @@ app.get('/api/pairs/:pairId/versions/:version/download', async (req, res) => {
 });
 
 // POST new pair
-app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }, { name: 'zip' }]), async (req, res) => {
+app.post('/api/pairs', upload.fields([{ name: 'files', maxCount: 50 }, { name: 'zip', maxCount: 1 }]), async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -75,13 +75,12 @@ app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }, { name:
     // create a slug for pairId based on actual name
     const pairId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     
-    let files = [{ name: 'component.jsx', content: 'export default function Component() { return <div>Empty</div>; }' }];
+    let files = [];
     
-    if (req.files['zip']) {
+    if (req.files['zip'] && req.files['zip'].length > 0) {
       try {
         const zip = new AdmZip(req.files['zip'][0].buffer);
         const zipEntries = zip.getEntries();
-        files = [];
         for (const e of zipEntries) {
           if (!e.isDirectory && !e.entryName.includes('metadata.json')) {
             files.push({ name: path.basename(e.entryName), content: zip.readAsText(e) });
@@ -90,13 +89,12 @@ app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }, { name:
       } catch (err) {
         return res.status(400).json({ error: 'Failed to parse ZIP file: ' + err.message });
       }
+    } else if (req.files['files'] && req.files['files'].length > 0) {
+      for (const file of req.files['files']) {
+        files.push({ name: file.originalname, content: file.buffer.toString('utf-8') });
+      }
     } else {
-      if (req.files['jsx']) {
-        files[0].content = req.files['jsx'][0].buffer.toString('utf-8');
-      }
-      if (req.files['json']) {
-        files.push({ name: 'data.json', content: req.files['json'][0].buffer.toString('utf-8') });
-      }
+      files = [{ name: 'component.jsx', content: 'export default function Component() { return <div>Empty</div>; }' }];
     }
 
     const pair = await storageService.createPair(pairId, name, description || '', files);

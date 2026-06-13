@@ -26,7 +26,7 @@ export default function App() {
   const [localFiles, setLocalFiles] = useState([]);
   const [selectedFileName, setSelectedFileName] = useState('');
 
-  const componentJsx = localFiles.find(f => f.name.endsWith('.jsx') || f.name.endsWith('.js'))?.content || '';
+  // We no longer need a single componentJsx, we pass all files to DynamicRenderer
   const dataJsonFile = localFiles.find(f => f.name.endsWith('.json') && !f.name.includes('metadata.json'));
   
   const parsedJsonData = useMemo(() => {
@@ -37,7 +37,7 @@ export default function App() {
   // UI for uploading
   const [showUpload, setShowUpload] = useState(false);
   const [uploadMode, setUploadMode] = useState('files'); // 'files' or 'zip'
-  const [uploadForm, setUploadForm] = useState({ name: '', desc: '', jsxFile: null, jsonFile: null, zipFile: null });
+  const [uploadForm, setUploadForm] = useState({ name: '', desc: '', files: [], zipFile: null });
   const [pairToDelete, setPairToDelete] = useState(null);
 
   useEffect(() => {
@@ -86,9 +86,9 @@ export default function App() {
   const handleCreatePair = async (e) => {
     e.preventDefault();
     try {
-      const p = await createPair(uploadForm.name, uploadForm.desc, uploadForm.jsxFile, uploadForm.jsonFile, uploadForm.zipFile);
+      const p = await createPair(uploadForm.name, uploadForm.desc, uploadForm.files, uploadForm.zipFile);
       setShowUpload(false);
-      setUploadForm({ name: '', desc: '', jsxFile: null, jsonFile: null, zipFile: null });
+      setUploadForm({ name: '', desc: '', files: [], zipFile: null });
       await loadPairs();
       setSelectedPairId(p.id);
       toast.success('Component created successfully!');
@@ -430,7 +430,7 @@ export default function App() {
                     </div>
                     <div className="flex-1 relative">
                       <DynamicRenderer
-                        jsxCode={componentJsx}
+                        files={localFiles}
                         jsonData={parsedJsonData}
                         onChange={(path, value) => {
                           if (!parsedJsonData || typeof parsedJsonData !== 'object') return;
@@ -473,7 +473,7 @@ export default function App() {
           </div>
           <div className="flex-1 relative">
             <DynamicRenderer
-              jsxCode={componentJsx}
+              files={localFiles}
               jsonData={parsedJsonData}
               onChange={(path, value) => {
                 if (!parsedJsonData || typeof parsedJsonData !== 'object') return;
@@ -526,21 +526,16 @@ export default function App() {
 
                 {uploadMode === 'files' ? (
                   <div className="space-y-4">
-                    <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative">
-                      <label className="flex flex-col items-center justify-center cursor-pointer">
-                        <Code className="text-indigo-400 mb-2" size={24} />
-                        <span className="text-sm font-medium text-slate-700">Component File (JSX)</span>
-                        <span className="text-xs text-slate-500 mt-1">{uploadForm.jsxFile ? uploadForm.jsxFile.name : 'No file chosen'}</span>
-                        <input type="file" accept=".jsx,.js" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, jsxFile: e.target.files[0]})} />
-                      </label>
-                    </div>
-                    <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative">
-                      <label className="flex flex-col items-center justify-center cursor-pointer">
-                        <Database className="text-emerald-400 mb-2" size={24} />
-                        <span className="text-sm font-medium text-slate-700">Optional Data (JSON)</span>
-                        <span className="text-xs text-slate-500 mt-1">{uploadForm.jsonFile ? uploadForm.jsonFile.name : 'No file chosen'}</span>
-                        <input type="file" accept=".json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, jsonFile: e.target.files[0]})} />
-                      </label>
+                    <div className="border border-dashed border-slate-300 rounded-xl p-8 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors cursor-pointer relative flex flex-col items-center justify-center">
+                      <Code className="text-indigo-500 mb-3" size={32} />
+                      <span className="text-sm font-medium text-slate-700">Select Multiple Files</span>
+                      <span className="text-xs text-slate-500 mt-1 text-center">Upload JSX, JS, JSON, CSS, and other related files.</span>
+                      <span className="text-sm font-bold text-indigo-600 mt-3">
+                        {uploadForm.files && uploadForm.files.length > 0 
+                          ? `${uploadForm.files.length} file(s) selected` 
+                          : 'Click to Browse'}
+                      </span>
+                      <input type="file" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setUploadForm({...uploadForm, files: Array.from(e.target.files)})} />
                     </div>
                   </div>
                 ) : (

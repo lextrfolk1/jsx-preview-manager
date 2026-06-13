@@ -17,12 +17,17 @@ export const getPairVersion = async (pairId, version) => {
   return res.data;
 };
 
-export const createPair = async (name, description, jsxFile, jsonFile, zipFile) => {
+export const createPair = async (name, description, files = [], zipFile = null) => {
   const formData = new FormData();
   formData.append('name', name);
   formData.append('description', description || '');
-  if (jsxFile) formData.append('jsx', jsxFile);
-  if (jsonFile) formData.append('json', jsonFile);
+  
+  if (files && files.length > 0) {
+    for (const f of files) {
+      formData.append('files', f);
+    }
+  }
+  
   if (zipFile) formData.append('zip', zipFile);
   
   const res = await axios.post(API_BASE, formData, {
