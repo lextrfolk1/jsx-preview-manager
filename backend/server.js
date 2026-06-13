@@ -74,8 +74,8 @@ app.post('/api/pairs', upload.fields([{ name: 'jsx' }, { name: 'json' }]), async
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
     
-    // create a slug for pairId
-    const pairId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now();
+    // create a slug for pairId based on actual name
+    const pairId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     
     let componentStr = 'export default function Component() { return <div>Empty</div>; }';
     let dataObj = {};
