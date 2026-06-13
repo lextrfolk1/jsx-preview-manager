@@ -1,0 +1,2 @@
+name = "jsx-preview-manager"
+pages_build_output_dir = "dist"
