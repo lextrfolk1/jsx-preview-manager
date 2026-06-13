@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getPairs, getPair, getPairVersion, createPair, saveVersion, saveJson, saveJsx, deletePair } from './services/api';
 import DynamicRenderer from './renderer/DynamicRenderer';
 import Editor from '@monaco-editor/react';
-import { Play, Code, Database, Save, FilePlus, Trash2, Copy, AlertCircle, FileJson, Layers, Download, Maximize, Minimize } from 'lucide-react';
+import { Play, Code, Database, Save, FilePlus, Trash2, Copy, AlertCircle, FileJson, Layers, Download, Maximize, Minimize, Edit3, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -15,6 +15,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('preview'); // preview, jsx, json
   const [errorMsg, setErrorMsg] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isEditingCode, setIsEditingCode] = useState(false);
   
   // Local edit states
   const [localJson, setLocalJson] = useState('');
@@ -225,25 +226,36 @@ export default function App() {
             </div>
 
             {/* TAB BAR */}
-            <div className="flex bg-white border-b">
-              <button 
-                className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'preview' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
-                onClick={() => setActiveTab('preview')}
-              >
-                <Play size={16} /> Preview UI
-              </button>
-              <button 
-                className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'jsx' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
-                onClick={() => setActiveTab('jsx')}
-              >
-                <Code size={16} /> JSX Editor
-              </button>
-              <button 
-                className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'json' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
-                onClick={() => setActiveTab('json')}
-              >
-                <FileJson size={16} /> JSON Data
-              </button>
+            <div className="flex bg-white border-b items-center justify-between pr-4">
+              <div className="flex">
+                <button 
+                  className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'preview' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setActiveTab('preview')}
+                >
+                  <Play size={16} /> Preview UI
+                </button>
+                <button 
+                  className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'jsx' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setActiveTab('jsx')}
+                >
+                  <Code size={16} /> JSX Editor
+                </button>
+                <button 
+                  className={`px-4 py-2 flex items-center gap-2 text-sm border-b-2 ${activeTab === 'json' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setActiveTab('json')}
+                >
+                  <FileJson size={16} /> JSON Data
+                </button>
+              </div>
+
+              {(activeTab === 'jsx' || activeTab === 'json') && (
+                <button 
+                  onClick={() => setIsEditingCode(!isEditingCode)} 
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium text-white transition-colors ${isEditingCode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+                >
+                  {isEditingCode ? <><X size={14} /> Lock {activeTab.toUpperCase()}</> : <><Edit3 size={14} /> Edit {activeTab.toUpperCase()}</>}
+                </button>
+              )}
             </div>
 
             {/* WORKSPACE & ERROR PANEL */}
@@ -277,25 +289,29 @@ export default function App() {
                   </div>
                 )}
                 {activeTab === 'jsx' && (
-                  <Editor
-                    height="100%"
-                    defaultLanguage="javascript"
-                    value={localJsx}
-                    onChange={(val) => setLocalJsx(val)}
-                    options={{ minimap: { enabled: false }, fontSize: 14 }}
-                  />
+                  <div className="absolute inset-0">
+                    <Editor
+                      height="100%"
+                      defaultLanguage="javascript"
+                      value={localJsx}
+                      onChange={(val) => setLocalJsx(val)}
+                      options={{ minimap: { enabled: false }, fontSize: 14, readOnly: !isEditingCode }}
+                    />
+                  </div>
                 )}
                 {activeTab === 'json' && (
-                  <Editor
-                    height="100%"
-                    defaultLanguage="json"
-                    value={localJson}
-                    onChange={(val) => {
-                      setLocalJson(val);
-                      try { JSON.parse(val); setErrorMsg(''); } catch (e) { setErrorMsg('Invalid JSON'); }
-                    }}
-                    options={{ minimap: { enabled: false }, fontSize: 14 }}
-                  />
+                  <div className="absolute inset-0">
+                    <Editor
+                      height="100%"
+                      defaultLanguage="json"
+                      value={localJson}
+                      onChange={(val) => {
+                        setLocalJson(val);
+                        try { JSON.parse(val); setErrorMsg(''); } catch (e) { setErrorMsg('Invalid JSON'); }
+                      }}
+                      options={{ minimap: { enabled: false }, fontSize: 14, readOnly: !isEditingCode }}
+                    />
+                  </div>
                 )}
               </div>
             </div>
