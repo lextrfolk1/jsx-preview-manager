@@ -254,13 +254,13 @@ export default function App() {
                           setActiveTab(f.name); 
                         }}
                       >
-                        <div className="flex items-center gap-2">
-                           <Code size={13} className={selectedFileName === f.name ? 'text-indigo-500' : 'text-slate-400'} />
-                           <span className="truncate">{f.name}</span>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                           <Code size={13} className={`shrink-0 ${selectedFileName === f.name ? 'text-indigo-500' : 'text-slate-400'}`} />
+                           <span className="truncate" title={f.name}>{f.name}</span>
                         </div>
                         <button 
                            title="Delete File"
-                           className={`opacity-0 group-hover/file:opacity-100 p-1 rounded transition-colors ${selectedFileName === f.name ? 'text-slate-500 hover:text-rose-600' : 'text-slate-400 hover:text-rose-600'}`}
+                           className={`shrink-0 opacity-0 group-hover/file:opacity-100 p-1 rounded transition-colors ${selectedFileName === f.name ? 'text-slate-500 hover:text-rose-600' : 'text-slate-400 hover:text-rose-600'}`}
                            onClick={(e) => {
                              e.stopPropagation();
                              setFileToDelete(f.name);
