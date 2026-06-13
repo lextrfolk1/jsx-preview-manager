@@ -1,47 +1,66 @@
 # JSX + JSON Preview Manager
 
-A local React application to preview, manage, version, and edit dynamically generated UI components (JSX) and their state (JSON).
+A modern, local React application to preview, manage, version, and edit dynamically generated UI components (JSX) and their state (JSON).
 
 ## Installation & Setup
 
-You can run this project either natively using Node.js or via Docker.
-
-### Option 1: Native (Node.js)
 Ensure you have Node.js (v18+) installed.
 
 ```bash
-# Make scripts executable
+# Make scripts executable (macOS/Linux)
 chmod +x scripts/start.sh scripts/stop.sh
 
 # Start the application
 ./scripts/start.sh
 ```
-This will start:
-- Backend: `http://localhost:3001`
-- Frontend: `http://localhost:5173`
 
-To stop the application:
+This will automatically launch:
+- **Backend API**: `http://localhost:3001`
+- **Frontend UI**: `http://localhost:5173`
+
+To gracefully shut down the servers, simply run:
 ```bash
 ./scripts/stop.sh
 ```
 
-### Option 2: Docker Compose
-```bash
-docker-compose up -d
-```
+---
 
-## How to use
+## Features & Supported Operations
 
-1. Open your browser to `http://localhost:5173`.
-2. Click **New Pair** in the sidebar.
-3. Provide a name and upload your `component.jsx` and `data.json` files.
-4. The component will render instantly. 
-5. You can use the top tabs to switch between **Preview UI**, **JSX Editor**, and **JSON Data**.
-6. When editing JSX or JSON, you can save your changes which will update the active version or create a new version.
+### 1. Creating Pairs
+You can create a new component/data pair by clicking **New Pair** in the sidebar. You have two options for uploading:
+- **Individual Files:** Upload your raw `component.jsx` and `data.json` files directly.
+- **ZIP Archive:** Upload a `.zip` file containing your JSX and JSON files. The backend will automatically extract and parse them!
+
+### 2. Live Preview
+- The **Preview UI** tab instantly transpiles your uploaded JSX code in the browser using Babel.
+- The UI runs in an isolated `iframe` sandbox for security, polyfilled with React and Tailwind CSS.
+- **Fullscreen Mode:** Click the Fullscreen button in the preview header to test your component across the entire screen.
+
+### 3. Editing Code (Safe Mode)
+- Switch to the **JSX Editor** or **JSON Data** tabs to view the underlying code.
+- By default, the editors are **locked (read-only)** to prevent accidental keystrokes.
+- To make changes, click the floating **Edit JSX / Edit JSON** toggle located in the tab bar.
+- If your JSON contains invalid syntax, an error panel will instantly warn you.
+
+### 4. Version Control
+- **Save:** Overwrites the *current* active version with your edits.
+- **Save as New Version:** Creates a brand new version (e.g., `v2`, `v3`) while preserving your old history.
+- Use the **Version Dropdown** in the top navigation bar to time-travel between different historical versions of your UI.
+
+### 5. Downloading
+- Click **Download** in the top-right corner to package the currently active version.
+- The server will dynamically generate a clean `.zip` file containing your `component.jsx` and `data.json` nicely tucked inside a named folder.
+
+### 6. Deleting
+- Hover over any pair in the sidebar to reveal the trash icon to completely delete a pair.
+
+---
 
 ## Component Contract
 
-Your uploaded JSX component should accept the following props:
+To properly interface with the preview environment, your uploaded JSX component must use a default export and should accept the following props:
+
 - `data`: The JSON object representing the state.
 - `onChange(path, value)`: A callback to notify the manager when data changes.
 - `onAction(actionName, payload)`: A callback for arbitrary user actions (e.g. submit).
@@ -66,7 +85,7 @@ export default function DynamicComponent({ data, onChange, onAction }) {
       </select>
 
       <button 
-        className="bg-blue-600 text-white px-4 py-2 rounded"
+        className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:shadow"
         onClick={() => onAction("submit", data)}
       >
         Submit
@@ -87,8 +106,3 @@ export default function DynamicComponent({ data, onChange, onAction }) {
   ]
 }
 ```
-
-## Versioning
-When you upload a new pair, it is saved as `v1`. 
-When you edit the JSX and click "Save as New Version", it will create `v2`, `v3`, etc.
-You can switch between versions using the dropdown in the top bar.
