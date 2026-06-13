@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { getPairs, getPair, getPairVersion, createPair, saveVersion, createVersion, deletePair } from './services/api';
 import DynamicRenderer from './renderer/DynamicRenderer';
 import Editor from '@monaco-editor/react';
-import { Play, Code, Database, Save, FilePlus, Trash2, Copy, AlertCircle, FileJson, Layers, Download, Maximize, Minimize, Edit3, X, ChevronRight } from 'lucide-react';
+import { Play, Code, Database, Save, FilePlus, Trash2, Copy, AlertCircle, FileJson, Layers, Download, Maximize, Minimize, Edit3, X, ChevronRight, Upload } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -299,12 +299,69 @@ export default function App() {
                       </div>
                     )}
                     {!isAddingFile && (
-                      <button 
-                        className="text-[13px] mt-1 ml-6 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium py-1 px-2 rounded flex items-center gap-2 w-[calc(100%-1.5rem)] transition-colors"
-                        onClick={(e) => { e.stopPropagation(); setIsAddingFile(true); setNewFileName(''); }}
-                      >
-                        <FilePlus size={13} /> <span className="opacity-80">Add File</span>
-                      </button>
+                      <div className="flex items-center gap-1 mt-1 ml-6 w-[calc(100%-1.5rem)]">
+                        <button 
+                          className="flex-1 text-[13px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium py-1 px-2 rounded flex justify-center items-center gap-1.5 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); setIsAddingFile(true); setNewFileName(''); }}
+                        >
+                          <FilePlus size={13} /> <span className="opacity-80">Add</span>
+                        </button>
+                        <label 
+                          htmlFor={'tree-upload-' + p.id}
+                          className="flex-1 text-[13px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium py-1 px-2 rounded flex justify-center items-center gap-1.5 transition-colors cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Upload size={13} /> <span className="opacity-80">Upload</span>
+                        </label>
+                        <input 
+                          type="file" 
+                          multiple 
+                          className="hidden" 
+                          id={'tree-upload-' + p.id}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={async (e) => {
+                            const uploadedFiles = Array.from(e.target.files);
+                            if (!uploadedFiles.length) return;
+                            
+                            const newLocalFiles = [...localFiles];
+                            let added = 0;
+                            const newlyOpened = [];
+                            
+                            try {
+                              for (let f of uploadedFiles) {
+                                if (newLocalFiles.find(ext => ext.name === f.name)) {
+                                  toast.error(`File ${f.name} already exists`);
+                                  continue;
+                                }
+                                const text = await f.text();
+                                newLocalFiles.push({ name: f.name, content: text });
+                                newlyOpened.push(f.name);
+                                added++;
+                              }
+                              
+                              if (added > 0) {
+                                setLocalFiles(newLocalFiles);
+                                const toOpen = newlyOpened.filter(n => !openFiles.includes(n));
+                                if (toOpen.length > 0) {
+                                  setOpenFiles([...openFiles, ...toOpen]);
+                                }
+                                setSelectedFileName(newlyOpened[0]);
+                                setActiveTab(newlyOpened[0]);
+                                
+                                saveVersion(selectedPairId, selectedVersion, newLocalFiles).then(() => {
+                                  toast.success(`${added} file(s) uploaded`);
+                                }).catch(err => {
+                                  toast.error('Failed to upload files: ' + err.message);
+                                });
+                              }
+                            } catch (err) {
+                              toast.error('Error reading files: ' + err.message);
+                            } finally {
+                              e.target.value = null;
+                            }
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                 )}
