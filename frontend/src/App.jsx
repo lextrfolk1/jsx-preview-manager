@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { getPairs, getPair, getPairVersion, createPair, saveVersion, saveJson, saveJsx, deletePair } from './services/api';
 import DynamicRenderer from './renderer/DynamicRenderer';
 import Editor from '@monaco-editor/react';
@@ -18,13 +18,18 @@ export default function App() {
   const [isEditingCode, setIsEditingCode] = useState(false);
   
   // Local edit states
-  const [localJson, setLocalJson] = useState('');
   const [localJsx, setLocalJsx] = useState('');
+  const [localJson, setLocalJson] = useState('{}');
+
+  const parsedJsonData = useMemo(() => {
+    try { return JSON.parse(localJson); } catch (e) { return {}; }
+  }, [localJson]);
   
   // UI for uploading
   const [showUpload, setShowUpload] = useState(false);
   const [uploadMode, setUploadMode] = useState('files'); // 'files' or 'zip'
   const [uploadForm, setUploadForm] = useState({ name: '', desc: '', jsxFile: null, jsonFile: null, zipFile: null });
+  const [pairToDelete, setPairToDelete] = useState(null);
 
   useEffect(() => {
     loadPairs();
@@ -77,14 +82,20 @@ export default function App() {
     }
   };
 
-  const handleDeletePair = async (id) => {
-    if (!confirm('Are you sure you want to delete this pair?')) return;
-    await deletePair(id);
-    if (selectedPairId === id) {
-      setSelectedPairId(null);
-      setPairMeta(null);
+  const confirmDeletePair = async () => {
+    if (!pairToDelete) return;
+    try {
+      await deletePair(pairToDelete);
+      if (selectedPairId === pairToDelete) {
+        setSelectedPairId(null);
+        setPairMeta(null);
+      }
+      loadPairs();
+      setPairToDelete(null);
+      toast.success('Pair deleted');
+    } catch (err) {
+      toast.error('Failed to delete pair: ' + err.message);
     }
-    loadPairs();
   };
 
   const handleJsonSave = async () => {
@@ -110,6 +121,26 @@ export default function App() {
       setErrorMsg('Failed to save: ' + err.message);
     }
   };
+
+  // Debounced auto-save
+  useEffect(() => {
+    if (!selectedPairId || !selectedVersion) return;
+    
+    // Only auto-save if we are actively editing
+    if (!isEditingCode) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        let parsedJson = JSON.parse(localJson);
+        await saveVersion(selectedPairId, selectedVersion, localJsx, parsedJson);
+        // Silently saved, don't show toast to avoid spam
+      } catch (err) {
+        // Syntax errors while typing shouldn't spam the console too much, we already show UI errors
+      }
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [localJsx, localJson, selectedPairId, selectedVersion, isEditingCode]);
 
   const handleJsxSaveNewVersion = async () => {
     try {
@@ -187,7 +218,7 @@ export default function App() {
               </div>
               <button 
                 className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-md transition-colors"
-                onClick={(e) => { e.stopPropagation(); handleDeletePair(p.id); }}
+                onClick={(e) => { e.stopPropagation(); setPairToDelete(p.id); }}
               >
                 <Trash2 size={16} />
               </button>
@@ -284,12 +315,10 @@ export default function App() {
                     <div className="flex-1 relative">
                       <DynamicRenderer
                         jsxCode={localJsx}
-                        jsonData={(() => {
-                          try { return JSON.parse(localJson); } catch (e) { return {}; }
-                        })()}
+                        jsonData={parsedJsonData}
                         onChange={handleRendererChange}
                         onAction={handleRendererAction}
-                        onError={(msg) => setErrorMsg(msg)}
+                        onError={setErrorMsg}
                       />
                     </div>
                   </div>
@@ -355,7 +384,7 @@ export default function App() {
 
       {/* UPLOAD MODAL */}
       {showUpload && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-[480px] overflow-hidden transform transition-all">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">Create New Pair</h2>
@@ -420,6 +449,22 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* DELETE CONFIRMATION MODAL */}
+      {pairToDelete && (
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-[400px] overflow-hidden transform transition-all">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight mb-2">Delete Pair?</h2>
+              <p className="text-sm text-slate-600 mb-6">Are you sure you want to completely delete this pair? This action cannot be undone.</p>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setPairToDelete(null)} className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
+                <button type="button" onClick={confirmDeletePair} className="px-5 py-2.5 text-sm font-medium bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow-sm hover:shadow transition-all">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
